@@ -1,6 +1,6 @@
-# clgam
+# `clgam` R package
 
-Composite link **generalized additive mixed models** (CL-GAMM) for areal counts:
+Composite link **generalized additive (mixed) models** for areal counts:
 disaggregate coarse Poisson observations to a nested fine support via a composition
 matrix \(C\), with anisotropic spatial P-splines and optional fine-scale smooth
 covariates. Estimation uses PIRLS + separation of penalties (SOP/SAP).
@@ -59,22 +59,47 @@ Toggle compiled SOP kernels with `options(clgam.use_rcpp = FALSE)`.
 
 ## Evaluation (simulations and models)
 
-When \(\eta_{\mathrm{true}}\) is known (`simulate_ata()`), report **MSE/MAE of \(\hat\eta\)**
-first (optional ±1.96 SE coverage vs truth). On real ATA with only coarse \(y\),
-use coarse Poisson deviance/log-score, mass calibration \(\max\|C\hat\mu-y\|\),
-and AIC only among fits that share the same likelihood. Do not treat
-correlation with a noisy fine log-SMR as the primary score, and do not compare
-AIC across heuristic Malone-style GAMs vs SOP CLMM.
+Evaluation hierarchy (consistent with the CL-GAMM/ATA scoring notes in
+`experiments/`):
+
+1) Simulations (truth known) — *primary*
+
+When \(\eta_{\mathrm{true}}\) is known (`simulate_ata()`), report
+**MSE/MAE of \(\hat\eta\)** on the fine support.
+If `elements=TRUE` is available, also report nominal 95% coverage of the
+pointwise \(\hat\eta \pm 1.96\,SE\) band (vs truth).
+
+Do not use correlation with a noisy fine oracle (e.g. SMR) as the primary
+verdict: `cor()` can look acceptable while amplitude/shape are wrong.
+
+2) Real ATA / fitted models (only coarse \(y\) observed) — *primary*
+
+Models are compared by their fit to the **aggregated** Poisson likelihood under
+the same likelihood family. Use:
+
+- Coarse Poisson deviance / log-score for \(y\) vs \(C\hat\mu\).
+- **Mass calibration**: \(\max_i |(C\hat\mu)_i - y_i|\) (and/or \(\|C\hat\mu-y\|_2\)).
+- AIC only within the same composite-link engine (e.g. `pois_SAP` variants).
+
+3) Fine diagnostics (Madrid / pennLC)
+
+If fine oracle information is available only for diagnosis, use MSE/MAE of
+fine log-rate vs oracle as a secondary check. Treat it as descriptive, not a
+formal ranking criterion.
 
 Full hierarchy: `../experiments/improvements/notes_metrics_ATA.md`
-(Research Brain: ATA-evaluation-metrics).
+(Research Brain: `ATA-evaluation-metrics`).
 
 ## Relation to papers
 
 - Spatial CLMM (ATP/ATA): Ayma, Durbán, Lee, Eilers — *Spatial Statistics* (2016)
 - Unpublished CL-GAMM (multi-resolution covariates): working draft in the CL-GAM project
 
-Method name in papers: **CL-GAMM**. R package name: **`clgam`**.
+Method name in papers: **CL-GAM**. R package name: **`clgam`**.
+
+For the “ATP via nested ATA” narrative used in the experiments, see
+`experiments/improvements/ST_PCLM_ATA.md` (renamed to “ATP (area-to-point)” in
+plots/tables, while the underlying estimator is still `pois_SAP`).
 
 ## License
 

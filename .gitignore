@@ -1,0 +1,5 @@
+/experiments/output/
+/experiments/R_libs/
+/clgam/src/*.o
+/clgam/src/*.so
+.DS_Store

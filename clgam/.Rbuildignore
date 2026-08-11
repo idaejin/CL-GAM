@@ -1,0 +1,8 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+^\.git$
+^\.github$
+^LICENSE\.md$
+^README\.Rmd$
+^clgam\.Rcheck$
+^\.DS_Store$

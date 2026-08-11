@@ -1,0 +1,12 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.o
+*.so
+*.dll
+src/*.o
+src/*.so
+.DS_Store
+clgam.Rcheck/
+*.tar.gz

@@ -1,0 +1,33 @@
+Package: spclmm
+Type: Package
+Title: Composite Link Mixed Models for Areal Data
+Version: 0.2.0
+Authors@R: c(
+    person("Diego", "Ayma Anza", role = c("aut"),
+           email = "dayma@est-econ.uc3m.es"),
+    person("Dae-Jin", "Lee", role = "cre",
+           email = "dae-jin.lee@ie.edu",
+           comment = "Maintains experiment fork under CL-GAM/experiments/pkg")
+  )
+Maintainer: Dae-Jin Lee <dae-jin.lee@ie.edu>
+Description: Composite link mixed models (CLMM / CL-GAM) for areal count data
+    with P-splines and SAP/PIRLS. Experiment fork: RcppArmadillo SOP kernels,
+    Matrix/spam C, Camarda–Durbán latent PCLM (arXiv:2412.04956).
+License: GPL (>=2)
+Encoding: UTF-8
+Imports:
+    classInt (>= 0.1-24),
+    MASS (>= 7.3-45),
+    Matrix (>= 1.2-7.1),
+    mgcv (>= 1.8-15),
+    RColorBrewer (>= 1.1-2),
+    Rcpp (>= 1.0.0),
+    sp (>= 1.2-5),
+    spam (>= 2.1-1)
+Suggests:
+    sf
+LinkingTo:
+    Rcpp,
+    RcppArmadillo
+LazyData: true
+RoxygenNote: 7.3.0

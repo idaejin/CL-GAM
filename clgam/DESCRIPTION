@@ -1,0 +1,35 @@
+Package: clgam
+Type: Package
+Title: Composite Link Generalized Additive Mixed Models
+Version: 0.1.8
+Authors@R: c(
+    person("Diego", "Ayma Anza", role = "aut",
+           email = "dayma@est-econ.uc3m.es"),
+    person("Dae-Jin", "Lee", role = c("aut", "cre"),
+           email = "dae-jin.lee@ie.edu"),
+    person("Maria", "Durban", role = "ctb"),
+    person("Paul H. C.", "Eilers", role = "ctb")
+  )
+Description: Fits composite link generalized additive mixed models (CL-GAMM)
+    for areal count data with P-splines and separation-of-penalties (SOP/SAP)
+    estimation. Supports area-to-area disaggregation with a composition matrix C
+    and multi-resolution covariates (Cases A--C). Includes RcppArmadillo kernels
+    for the SOP hot path and helpers to simulate synthetic ATA data for examples
+    and tests. No proprietary health microdata are shipped with the package.
+License: GPL-2
+Encoding: UTF-8
+Imports:
+    MASS (>= 7.3-45),
+    Matrix (>= 1.2-7.1),
+    Rcpp (>= 1.0.0),
+    spam (>= 2.1-1)
+Suggests:
+    sf (>= 1.0-0),
+    testthat (>= 3.0.0)
+LinkingTo:
+    Rcpp,
+    RcppArmadillo
+RoxygenNote: 7.3.0
+Config/testthat/edition: 3
+URL: https://github.com/idaejin/clgam
+BugReports: https://github.com/idaejin/clgam/issues

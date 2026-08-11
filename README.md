@@ -1,6 +1,6 @@
-# clgam (CL-GAMM)
+# clgam (CL-GAM)
 
-Composite link **generalized additive mixed models** (CL-GAMM) for **areal count data**.
+Composite link generalized additive (mixed) models for areal count data.
 
 The package supports:
 - **Area-to-area disaggregation** from coarse Poisson observations to a **nested fine support** via a **composition matrix** `C`.

@@ -2,4 +2,6 @@
 /experiments/R_libs/
 /clgam/src/*.o
 /clgam/src/*.so
+/experiments/pkg/**/src/*.o
+/experiments/pkg/**/src/*.so
 .DS_Store

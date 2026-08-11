@@ -1,2 +1,0 @@
-## Use C++17 if available; OpenMP optional
-CXX_STD = CXX17

@@ -1,5 +1,0 @@
-R_libs/
-output/*.pdf
-output/*.rds
-.Rhistory
-.RData

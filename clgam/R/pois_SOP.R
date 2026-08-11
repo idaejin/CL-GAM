@@ -29,15 +29,24 @@
 #'   archival SMiMR code (raw \code{nlcovfine} unpenalized in \code{X} +
 #'   \code{Zxk}). Prefer \code{\link{clgam}}, which defaults to
 #'   \code{nl.basis="pspline"}.
-#' @param orth.smooth if \code{TRUE}, project spatial random bases orthogonal
-#'   to the additive smooth span so \eqn{f(s)} cannot absorb \eqn{g(z)}. Defaults to
+#' @param orth.smooth if \code{TRUE}, project spatial bases (except the intercept)
+#'   orthogonal to the space of \emph{fine-scale} covariate effects so
+#'   \eqn{f(s)} cannot absorb \eqn{g(z)}. The projection uses the raw fine
+#'   B-spline bases \eqn{B(z)} (not their mixed-model reparameterization) and,
+#'   when present, linear fine covariates \code{lcovfine}. Coarse-scale smooths
+#'   marked via \code{nl.level="coarse"} are excluded. Defaults to
 #'   \code{TRUE} for \code{nl.basis="pspline"}, \code{FALSE} for
 #'   \code{"legacy"}.
+#' @param nl.level optional length-\eqn{K} labels \code{"fine"} / \code{"coarse"}
+#'   for columns of \code{nlcovfine} (recycled if length 1). \code{NULL} treats
+#'   all nonlinear columns as fine (Case A). Use \code{"coarse"} for Case B and
+#'   \code{c("fine","coarse")} for Case C so aggregated \eqn{h(z_a)} does not
+#'   enter the spatial identifiability projection.
 #' @return A \code{"clgam"} object with fine-scale \code{eta}, fitted means,
 #'   variance components, and optional SEs / AIC.
 #' @export
-#' @seealso \code{\link{clgam}}, \code{\link{pois_incat_SOP}}, \code{\link{pois_TMB}}
-pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL, C, x1lim = NULL, x2lim = NULL, ndx = c(15, 15), bdeg = c(3, 3), pord = c(2, 2), decom = 1, thr = c(1e-06, 1e-06), maxit = c(100, 100), parold = c(1, 1), bold = NULL, trace = FALSE, elements = FALSE, ndxnl = 15, bdegnl = 3, pordnl = 2, paroldnl = NULL, sparse.backend = "auto", nl.basis = c("legacy", "pspline"), orth.smooth = NULL) {
+#' @seealso \code{\link{clgam}}, \code{\link{pois_incat_SOP}}
+pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL, C, x1lim = NULL, x2lim = NULL, ndx = c(15, 15), bdeg = c(3, 3), pord = c(2, 2), decom = 1, thr = c(1e-06, 1e-06), maxit = c(100, 100), parold = c(1, 1), bold = NULL, trace = FALSE, elements = FALSE, ndxnl = 15, bdegnl = 3, pordnl = 2, paroldnl = NULL, sparse.backend = "auto", nl.basis = c("legacy", "pspline"), orth.smooth = NULL, nl.level = NULL) {
   nl.basis <- match.arg(nl.basis)
   if (is.null(orth.smooth)) {
     orth.smooth <- identical(nl.basis, "pspline")
@@ -153,27 +162,56 @@ pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL,
   n_sp_fixed <- ncol(X)
   n_sp_random <- ncol(Z)
 
-  # Include linear fine-scale covariates into X
+  # Identifiability: spatial bases ⊥ fine-scale covariate space A_f before
+  # appending covariate columns. A_f = span{B(z) for fine smooths} ∪ {lcovfine}.
+  # Coarse-scale smooths (nl.level="coarse") are excluded — they enter after C.
+  nl_level_resolved <- character(0)
+  orth_info <- list(
+    applied = FALSE,
+    nl.level = character(0),
+    max_abs_QX = NA_real_,
+    max_abs_QZ = NA_real_
+  )
+  if (orth.smooth && (!is.null(nlcovfine) || !is.null(lcovfine))) {
+    if (!is.null(nlcovfine)) {
+      nl_level_resolved <- .resolve_nl_level(nk, nl.level)
+    }
+    Af <- .build_orth_Af(
+      Bk = if (!is.null(nlcovfine)) Bk else NULL,
+      nl.level = nl_level_resolved,
+      lcovfine = lcovfine
+    )
+    if (!is.null(Af) && ncol(Af) > 0L) {
+      if (n_sp_fixed > 1L) {
+        X[, 2:n_sp_fixed] <- .orth_cols(X[, 2:n_sp_fixed, drop = FALSE], Af)
+      }
+      Z[, seq_len(n_sp_random)] <- .orth_cols(
+        Z[, seq_len(n_sp_random), drop = FALSE], Af
+      )
+      orth_info <- list(
+        applied = TRUE,
+        nl.level = nl_level_resolved,
+        max_abs_QX = if (n_sp_fixed > 1L) {
+          .orth_cross_max(X[, 2:n_sp_fixed, drop = FALSE], Af)
+        } else {
+          0
+        },
+        max_abs_QZ = .orth_cross_max(Z[, seq_len(n_sp_random), drop = FALSE], Af)
+      )
+    } else {
+      orth_info$nl.level <- nl_level_resolved
+    }
+  }
+
+  # Include linear fine-scale covariates into X (after spatial orthogonalization)
   if (!is.null(lcovfine)) {
     X <- cbind(X, lcovfine)
   }
 
-  # Include non-linear fine-scale covariates into X & Z
+  # Include non-linear covariates into X & Z
   nl_fixed_idx <- NULL
   if (!is.null(nlcovfine)) {
     nl_fixed_idx <- vector("list", nk)
-    # Additive identifiability: spatial bases ⊥ span{B(z_k)} so f(s) cannot
-    # soak up g(z). Default on for nl.basis="pspline".
-    if (orth.smooth) {
-      Bsm <- do.call(cbind, Bk)
-      # Drop intercept column of spatial fixed effects (keep overall level)
-      if (n_sp_fixed > 1L) {
-        X[, 2:n_sp_fixed] <- .orth_cols(X[, 2:n_sp_fixed, drop = FALSE], Bsm)
-      }
-      Z[, seq_len(n_sp_random)] <- .orth_cols(
-        Z[, seq_len(n_sp_random), drop = FALSE], Bsm
-      )
-    }
     if (identical(nl.basis, "pspline")) {
       # Null space without constant: spatial tensor already has an intercept.
       # For pord=2 this is the linear trend in z; Zxk carries the smooth deviation.
@@ -437,7 +475,9 @@ pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL,
     ),
     leffects = leffects, sdleffects = sdleffects,
     nleffects = nleffects, sdnleffects = sdnleffects,
-    nl.basis = nl.basis, orth.smooth = orth.smooth
+    nl.basis = nl.basis, orth.smooth = orth.smooth,
+    nl.level = if (length(nl_level_resolved)) nl_level_resolved else nl.level,
+    orth.info = orth_info
   )
 
   if (isTRUE(elements)) {
@@ -460,6 +500,27 @@ pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL,
     out$bic <- bic
     out$sd.eta <- sd.eta
     out$sd.exp.eta <- sd.eta * exp(eta)
+
+    # Overwrite smooth SEs with PIRLS Bayesian covariance (unweighted Gram
+    # fallback above can collapse for multiple orth.smooth blocks).
+    if (!is.null(nlcovfine) && nk > 0L) {
+      Vp <- rbind(
+        cbind(M1$S11, M1$S12),
+        cbind(M1$S21, M1$S22)
+      )
+      Cmat <- cbind(X, Z)
+      sdnleffects <- matrix(0, dimfine, nk)
+      for (k in 1:nk) {
+        idx <- nl_fixed_idx[[k]]
+        low <- sum(np[2:(k + 3)]) + 1
+        sup <- low + np[k + 4] - 1
+        sel <- c(idx, np[1] + low:sup)
+        Cg <- Cmat[, sel, drop = FALSE]
+        Sg <- Vp[sel, sel, drop = FALSE]
+        sdnleffects[, k] <- .se_smooth_centered(Cg, Sg)
+      }
+      out$sdnleffects <- sdnleffects
+    }
   }
 
   .as_clgam(out, call = match.call(), family = "spatial")

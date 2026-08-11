@@ -11,6 +11,9 @@
 #' @param smooth optional covariates for univariate P-spline smooths
 #'   (Case A/B/C). Matrix with one column (A or B) or two (Case C: fine then
 #'   coarse-expanded). Default basis \code{nl.basis="pspline"}.
+#' @param smooth_level optional \code{"fine"} / \code{"coarse"} labels for
+#'   \code{smooth} columns (passed as \code{nl.level} to \code{pois_SOP}).
+#'   Use \code{"coarse"} for Case B and \code{c("fine","coarse")} for Case C.
 #' @param knots spatial knot counts (\code{ndx})
 #' @param knots_nl knot count(s) for each smooth covariate (\code{ndxnl})
 #' @param elements compute AIC/BIC/SEs (default \code{TRUE})
@@ -25,6 +28,7 @@ clgam <- function(y,
                   exposure = NULL,
                   linear = NULL,
                   smooth = NULL,
+                  smooth_level = NULL,
                   coords = NULL,
                   knots = c(15L, 15L),
                   knots_nl = 10L,
@@ -39,6 +43,9 @@ clgam <- function(y,
   stopifnot(!is.null(x1), !is.null(x2), !missing(C))
   dots <- list(...)
   if (is.null(dots$nl.basis)) dots$nl.basis <- "pspline"
+  if (is.null(dots$nl.level) && !is.null(smooth_level)) {
+    dots$nl.level <- smooth_level
+  }
   out <- do.call(pois_SOP, c(list(
     y = y, x1 = x1, x2 = x2, efine = exposure,
     lcovfine = linear, nlcovfine = smooth,

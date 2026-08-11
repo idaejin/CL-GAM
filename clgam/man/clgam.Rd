@@ -12,6 +12,7 @@ clgam(
   exposure = NULL,
   linear = NULL,
   smooth = NULL,
+  smooth_level = NULL,
   coords = NULL,
   knots = c(15L, 15L),
   knots_nl = 10L,
@@ -33,6 +34,10 @@ clgam(
 \item{smooth}{optional covariates for univariate P-spline smooths
 (Case A/B/C). Matrix with one column (A or B) or two (Case C: fine then
 coarse-expanded). Default basis \code{nl.basis="pspline"}.}
+
+\item{smooth_level}{optional \code{"fine"} / \code{"coarse"} labels for
+\code{smooth} columns (passed as \code{nl.level} to \code{pois_SOP}).
+Use \code{"coarse"} for Case B and \code{c("fine","coarse")} for Case C.}
 
 \item{coords}{optional \code{n_fine x 2} matrix}
 

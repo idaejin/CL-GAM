@@ -45,6 +45,8 @@ plot(fit, which = 4, g_true = dat$g_true)
 Canonical low-level fitters: `pois_SOP` / `pois_incat_SOP`
 (legacy aliases `pois_SAP` / `pois_incat_SAP` remain available).
 Two-group contrasts: `clgam_contrast()` (wraps `pois_incat_SOP`).
+(Optional Laplace/TMB coverage benchmark lives under
+`experiments/benchmark_tmb/` — not part of this package.)
 
 S3 methods: `print`, `summary`, `coef`, `fitted`, `residuals`, `predict`,
 `plot`, `AIC`, `BIC`, `logLik`, `nobs`, `deviance`.

@@ -96,9 +96,12 @@ test_that("Case B coarse covariate factors through C", {
   fit <- clgam(
     dat$y, dat$x1, dat$x2, dat$C,
     exposure = dat$efine, smooth = dat$nlcovfine,
+    smooth_level = dat$nl_level,
     knots = c(8L, 8L), knots_nl = 10L,
     elements = FALSE, trace = FALSE
   )
+  expect_equal(fit$nl.level, "coarse")
+  expect_false(isTRUE(fit$orth.info$applied)) # coarse-only → no A_f from smooths
   h <- fit$nleffects[, 1] - mean(fit$nleffects[, 1])
   ht <- dat$h_true - mean(dat$h_true)
   expect_gt(cor(h, ht), 0.7)
@@ -124,9 +127,13 @@ test_that("Case C fine+coarse covariates", {
   fit <- clgam(
     dat$y, dat$x1, dat$x2, dat$C,
     exposure = dat$efine, smooth = dat$nlcovfine,
+    smooth_level = dat$nl_level,
     knots = c(8L, 8L), knots_nl = c(8L, 6L),
     elements = FALSE, trace = FALSE
   )
+  expect_equal(fit$nl.level, c("fine", "coarse"))
+  expect_true(fit$orth.info$applied)
+  expect_lt(fit$orth.info$max_abs_QZ, 1e-8)
   expect_equal(ncol(fit$nleffects), 2L)
   g <- fit$nleffects[, 1] - mean(fit$nleffects[, 1])
   h <- fit$nleffects[, 2] - mean(fit$nleffects[, 2])

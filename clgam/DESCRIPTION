@@ -1,7 +1,7 @@
 Package: clgam
 Type: Package
 Title: Composite Link Generalized Additive (Mixed) Models
-Version: 0.1.9
+Version: 0.1.11
 Authors@R: c(
     person("Diego", "Ayma Anza", role = "aut",
            email = "dayma@est-econ.uc3m.es"),
@@ -26,8 +26,7 @@ Imports:
     spam (>= 2.1-1)
 Suggests:
     sf (>= 1.0-0),
-    testthat (>= 3.0.0),
-    TMB
+    testthat (>= 3.0.0)
 LinkingTo:
     Rcpp,
     RcppArmadillo

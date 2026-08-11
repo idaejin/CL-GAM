@@ -260,13 +260,21 @@ simulate_ata <- function(n_coarse = 12L,
     sf_coarse = sf_coarse, sf_fine = sf_fine,
     geometry = "voronoi",
     case = case,
-    covariate_level = if (isTRUE(include_covariate)) covariate_level else NA_character_
+    covariate_level = if (isTRUE(include_covariate)) covariate_level else NA_character_,
+    nl_level = NULL
   )
   if (!is.null(nlcovfine)) {
     out$nlcovfine <- nlcovfine
     out$z <- z
     if (!is.null(z_f)) out$z_f <- z_f
     if (!is.null(g_true)) out$g_true <- g_true
+    out$nl_level <- switch(
+      case,
+      A = "fine",
+      B = "coarse",
+      C = c("fine", "coarse"),
+      rep("fine", ncol(nlcovfine))
+    )
   }
   if (!is.null(z_a)) {
     out$z_a <- z_a

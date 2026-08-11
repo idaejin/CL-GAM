@@ -31,7 +31,8 @@ pois_SOP(
   paroldnl = NULL,
   sparse.backend = "auto",
   nl.basis = c("legacy", "pspline"),
-  orth.smooth = NULL
+  orth.smooth = NULL,
+  nl.level = NULL
 )
 
 pois_SAP(
@@ -60,7 +61,8 @@ pois_SAP(
   paroldnl = NULL,
   sparse.backend = "auto",
   nl.basis = c("legacy", "pspline"),
-  orth.smooth = NULL
+  orth.smooth = NULL,
+  nl.level = NULL
 )
 }
 \arguments{
@@ -106,10 +108,20 @@ archival SMiMR code (raw \code{nlcovfine} unpenalized in \code{X} +
 \code{Zxk}). Prefer \code{\link{clgam}}, which defaults to
 \code{nl.basis="pspline"}.}
 
-\item{orth.smooth}{if \code{TRUE}, project spatial random bases orthogonal
-to the additive smooth span so \eqn{f(s)} cannot absorb \eqn{g(z)}. Defaults to
+\item{orth.smooth}{if \code{TRUE}, project spatial bases (except the intercept)
+orthogonal to the space of \emph{fine-scale} covariate effects so
+\eqn{f(s)} cannot absorb \eqn{g(z)}. The projection uses the raw fine
+B-spline bases \eqn{B(z)} (not their mixed-model reparameterization) and,
+when present, linear fine covariates \code{lcovfine}. Coarse-scale smooths
+marked via \code{nl.level="coarse"} are excluded. Defaults to
 \code{TRUE} for \code{nl.basis="pspline"}, \code{FALSE} for
 \code{"legacy"}.}
+
+\item{nl.level}{optional length-\eqn{K} labels \code{"fine"} / \code{"coarse"}
+for columns of \code{nlcovfine} (recycled if length 1). \code{NULL} treats
+all nonlinear columns as fine (Case A). Use \code{"coarse"} for Case B and
+\code{c("fine","coarse")} for Case C so aggregated \eqn{h(z_a)} does not
+enter the spatial identifiability projection.}
 }
 \value{
 A \code{"clgam"} object with fine-scale \code{eta}, fitted means,
@@ -122,5 +134,5 @@ estimating variance components by separation of overlapping precision
 matrices (SOP). \code{pois_SAP} is retained as a compatibility alias.
 }
 \seealso{
-\code{\link{clgam}}, \code{\link{pois_incat_SOP}}, \code{\link{pois_TMB}}
+\code{\link{clgam}}, \code{\link{pois_incat_SOP}}
 }

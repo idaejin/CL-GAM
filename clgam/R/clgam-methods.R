@@ -9,6 +9,7 @@ NULL
 #' @param object a \code{clgam} fit
 #' @param ... unused
 #' @export
+#' @method coef clgam
 coef.clgam <- function(object, which = c("all", "fixed", "random"), ...) {
   which <- match.arg(which)
   bf <- object$b.fixed
@@ -27,6 +28,7 @@ coef.clgam <- function(object, which = c("all", "fixed", "random"), ...) {
 #'   \code{"eta"} (fine log-risk), \code{"gamma"} (fine intensity),
 #'   \code{"response"} (alias of \code{mu}), or \code{"exp.eta"}
 #' @export
+#' @method fitted clgam
 fitted.clgam <- function(object,
                          type = c("mu", "eta", "gamma", "response", "exp.eta"),
                          ...) {
@@ -42,6 +44,7 @@ fitted.clgam <- function(object,
 #' @rdname clgam-methods
 #' @param type residual type: deviance, Pearson, or response (\code{y - mu})
 #' @export
+#' @method residuals clgam
 residuals.clgam <- function(object,
                             type = c("deviance", "pearson", "response"),
                             ...) {
@@ -67,12 +70,14 @@ residuals.clgam <- function(object,
 
 #' @rdname clgam-methods
 #' @export
+#' @method nobs clgam
 nobs.clgam <- function(object, ...) {
   if (!is.null(object$y)) length(object$y) else length(object$mu)
 }
 
 #' @rdname clgam-methods
 #' @export
+#' @method deviance clgam
 deviance.clgam <- function(object, ...) {
   d <- object$dev
   if (length(d) > 1L) sum(d) else d
@@ -80,6 +85,7 @@ deviance.clgam <- function(object, ...) {
 
 #' @rdname clgam-methods
 #' @export
+#' @method logLik clgam
 logLik.clgam <- function(object, ...) {
   # Poisson log-lik up to constant; ed used as df when available
   y <- object$y
@@ -95,6 +101,7 @@ logLik.clgam <- function(object, ...) {
 #' @rdname clgam-methods
 #' @param k penalty in AIC (default 2)
 #' @export
+#' @method AIC clgam
 AIC.clgam <- function(object, ..., k = 2) {
   if (!is.null(object$aic) && isTRUE(all.equal(k, 2))) {
     a <- object$aic
@@ -106,6 +113,7 @@ AIC.clgam <- function(object, ..., k = 2) {
 
 #' @rdname clgam-methods
 #' @export
+#' @method BIC clgam
 BIC.clgam <- function(object, ...) {
   if (!is.null(object$bic)) {
     b <- object$bic
@@ -129,6 +137,7 @@ BIC.clgam <- function(object, ...) {
 #'   return a list with \code{fit} and \code{se.fit}
 #' @param ... unused
 #' @export
+#' @method predict clgam
 predict.clgam <- function(object,
                           newdata = NULL,
                           type = c("eta", "mu", "gamma", "response", "exp.eta"),
@@ -167,6 +176,7 @@ predict.clgam <- function(object,
 #' @param g_true optional true smooth vector aligned with fine cells
 #' @param ... graphical parameters (\code{cex}, \code{pch}, \code{lwd}, ...)
 #' @export
+#' @method plot clgam
 plot.clgam <- function(x,
                        which = 1:2,
                        ask = prod(graphics::par("mfcol")) < length(which) &&

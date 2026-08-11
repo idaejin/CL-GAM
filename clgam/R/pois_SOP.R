@@ -1,8 +1,28 @@
-#' Poisson CL-GAMM via PIRLS + SOP/SAP (legacy name)
+#' Poisson CL-GAMM via PIRLS + SOP
 #'
-#' Prefer \code{\link{clgam}} in new code. Same numerical engine as the Madrid
-#' / paper scripts.
+#' Prefer \code{\link{clgam}} in new code. Fits a composite-link Poisson GAMM
+#' with anisotropic spatial P-splines and optional fine-scale smooth covariates,
+#' estimating variance components by separation of overlapping precision
+#' matrices (SOP). \code{pois_SAP} is retained as a compatibility alias.
 #'
+#' @param y coarse counts (length \eqn{n})
+#' @param x1,x2 fine-scale spatial coordinates (length \eqn{m})
+#' @param efine fine-scale exposure / expected counts (length \eqn{m}; default 1)
+#' @param lcovfine optional fine-scale linear covariates (\(m \times p\))
+#' @param nlcovfine optional fine-scale covariates for univariate P-spline
+#'   smooths (\(m \times K\))
+#' @param C composition matrix (\(n \times m\))
+#' @param x1lim,x2lim optional coordinate limits
+#' @param ndx,bdeg,pord spatial P-spline settings
+#' @param decom mixed-model decomposition for spatial bases
+#' @param thr convergence tolerances \code{c(eta, tau2)}
+#' @param maxit max outer / inner iterations
+#' @param parold,paroldnl initial variance components
+#' @param bold optional starting coefficients
+#' @param trace print iteration banner
+#' @param elements compute AIC/BIC and SEs
+#' @param ndxnl,bdegnl,pordnl settings for each smooth covariate
+#' @param sparse.backend composition-matrix backend (see \code{\link{as_comp_C}})
 #' @param nl.basis how smooth covariates enter the mixed model:
 #'   \code{"pspline"} uses the P-spline null space \code{Xxk} plus penalized
 #'   \code{Zxk} from \code{mm_basis}; \code{"legacy"} (default here) matches
@@ -10,11 +30,14 @@
 #'   \code{Zxk}). Prefer \code{\link{clgam}}, which defaults to
 #'   \code{nl.basis="pspline"}.
 #' @param orth.smooth if \code{TRUE}, project spatial random bases orthogonal
-#'   to the additive smooth span so \(f(s)\) cannot absorb \(g(z)\). Defaults to
+#'   to the additive smooth span so \eqn{f(s)} cannot absorb \eqn{g(z)}. Defaults to
 #'   \code{TRUE} for \code{nl.basis="pspline"}, \code{FALSE} for
 #'   \code{"legacy"}.
+#' @return A \code{"clgam"} object with fine-scale \code{eta}, fitted means,
+#'   variance components, and optional SEs / AIC.
 #' @export
-pois_SAP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL, C, x1lim = NULL, x2lim = NULL, ndx = c(15, 15), bdeg = c(3, 3), pord = c(2, 2), decom = 1, thr = c(1e-06, 1e-06), maxit = c(100, 100), parold = c(1, 1), bold = NULL, trace = FALSE, elements = FALSE, ndxnl = 15, bdegnl = 3, pordnl = 2, paroldnl = NULL, sparse.backend = "auto", nl.basis = c("legacy", "pspline"), orth.smooth = NULL) {
+#' @seealso \code{\link{clgam}}, \code{\link{pois_incat_SOP}}, \code{\link{pois_TMB}}
+pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL, C, x1lim = NULL, x2lim = NULL, ndx = c(15, 15), bdeg = c(3, 3), pord = c(2, 2), decom = 1, thr = c(1e-06, 1e-06), maxit = c(100, 100), parold = c(1, 1), bold = NULL, trace = FALSE, elements = FALSE, ndxnl = 15, bdegnl = 3, pordnl = 2, paroldnl = NULL, sparse.backend = "auto", nl.basis = c("legacy", "pspline"), orth.smooth = NULL) {
   nl.basis <- match.arg(nl.basis)
   if (is.null(orth.smooth)) {
     orth.smooth <- identical(nl.basis, "pspline")
@@ -206,13 +229,13 @@ pois_SAP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL,
 
   # Optimization procedure
   for (i in 1:(maxit[1])) {
-    # Set the clock for SAP
-    start.SAP <- proc.time()[3]
+    # Set the clock for SOP
+    start.SOP <- proc.time()[3]
     # Compute working vector
     z <- .clmm_working_z(C, gamma, eta, mu, y, groups = C_groups)
       # Compute CLMM matrices
     mat <- clmm_mat(C, gamma, X, Z, z, mu, groups = C_groups)
-    sap_cache <- NULL
+    sop_cache <- NULL
 
     for (it in 1:(maxit[2])) {
       # Compute penalty matrix: block diagonal matrix
@@ -225,14 +248,14 @@ pois_SAP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL,
       }
       G <- 1/Ginv
 
-      sap <- .sap_solve_schur(
+      sop <- .sop_solve_schur(
         XtX = mat$XtX, ZtX = mat$ZtX, ZtZ = mat$ZtZ,
-        ZtXtZ = mat$ZtXtZ, u = mat$u, G = G, cache = sap_cache
+        ZtXtZ = mat$ZtXtZ, u = mat$u, G = G, cache = sop_cache
       )
-      sap_cache <- sap$cache
-      b.fixed <- sap$b.fixed
-      b.random <- sap$b.random
-      dZtNZ <- sap$dZtNZ
+      sop_cache <- sop$cache
+      b.fixed <- sop$b.fixed
+      b.random <- sop$b.random
+      dZtNZ <- sop$dZtNZ
 
       # Tau 1
       G1inv.d <- (1/la[1])*G1inv.n
@@ -284,12 +307,12 @@ pois_SAP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL,
       if (dla < thr[2] || (it >= 8L && dla_rel < thr[2])) break
     }
 
-    # Stop the clock for SAP
-    end.SAP <- proc.time()[3]
+    # Stop the clock for SOP
+    end.SOP <- proc.time()[3]
 
     # Print time
     if (trace) {
-      cat("Elapsed time in seconds:", c(end.SAP - start.SAP),"\n")
+      cat("Elapsed time in seconds:", c(end.SOP - start.SOP),"\n")
     }
 
     # Hold old eta
@@ -441,4 +464,8 @@ pois_SAP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL,
 
   .as_clgam(out, call = match.call(), family = "spatial")
 }
+
+#' @rdname pois_SOP
+#' @export
+pois_SAP <- pois_SOP
 

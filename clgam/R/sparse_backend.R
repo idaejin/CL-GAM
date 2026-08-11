@@ -1,6 +1,6 @@
 #' Sparse backends for composition and Kronecker penalties
 #'
-#' CL-GAM / \code{pois_SAP} already densifies the SOP system in coefficient
+#' CL-GAM / \code{pois_SOP} already densifies the SOP system in coefficient
 #' space; sparse algebra helps for (1) the composition matrix \code{C} and
 #' (2) Kronecker P-spline precisions (LMMsolver-style), not for wrapping the
 #' dense \code{V+D} block.
@@ -17,6 +17,19 @@ NULL
   match.arg(backend, c("Matrix", "spam", "dense", "auto"))
 }
 
+#' Coerce Matrix / matrix to spam without relying on missing S4 methods
+#' @keywords internal
+.as_spam <- function(C) {
+  if (inherits(C, "spam")) return(C)
+  spam::as.spam(as.matrix(C))
+}
+
+#' Coerce spam to dgCMatrix
+#' @keywords internal
+.spam_to_dgC <- function(C) {
+  Matrix::Matrix(as.matrix(C), sparse = TRUE)
+}
+
 #' Coerce composition matrix to a sparse (or dense) backend
 #'
 #' @param C composition matrix
@@ -24,19 +37,6 @@ NULL
 #'   or \code{"auto"} (option \code{clgam.sparse.backend}, default Matrix)
 #' @return matrix-like object suitable for \code{\%*\%}
 #' @export
-#' Coerce Matrix / matrix → spam without relying on missing S4 methods
-#' @keywords internal
-.as_spam <- function(C) {
-  if (inherits(C, "spam")) return(C)
-  spam::as.spam(as.matrix(C))
-}
-
-#' Coerce spam → dgCMatrix
-#' @keywords internal
-.spam_to_dgC <- function(C) {
-  Matrix::Matrix(as.matrix(C), sparse = TRUE)
-}
-
 as_comp_C <- function(C, backend = "auto") {
   backend <- .clgam_sparse_backend(backend)
   if (identical(backend, "auto")) backend <- "Matrix"
@@ -75,7 +75,7 @@ as_comp_C <- function(C, backend = "auto") {
   Matrix::Matrix(C, sparse = TRUE)
 }
 
-# Keep internal alias used by pois_* 
+# Keep internal alias used by pois_*
 .as_comp_C <- function(C, backend = "auto") as_comp_C(C, backend = backend)
 
 #' Detect 0-1 partition composition (each fine cell → one coarse)
@@ -161,7 +161,7 @@ sparse_P2D <- function(m1, m2, lambda1 = 1, lambda2 = 1, pord = 2L,
 #' @param w positive diagonal weights (length \code{nrow(P)})
 #' @param b right-hand side
 #' @return solution vector
-#' @export
+#' @keywords internal
 sparse_chol_solve <- function(P, w, b) {
   if (inherits(P, "spam")) {
     A <- P + spam::diag.spam(w, nrow = length(w), ncol = length(w))

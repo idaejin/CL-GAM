@@ -28,7 +28,8 @@
   keep <- apply(B, 2L, function(v) stats::sd(v) > 1e-12)
   if (!any(keep)) return(A)
   B <- B[, keep, drop = FALSE]
-  qr.resid(qr(B), A)
+  Q <- qr.Q(qr(B))
+  A - Q %*% crossprod(Q, A)
 }
 
 #' Pointwise SE for an additive smooth under a sum-to-zero (centering) constraint.

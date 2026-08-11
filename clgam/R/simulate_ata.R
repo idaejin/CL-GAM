@@ -64,11 +64,11 @@
 #' \enumerate{
 #'   \item Build a \strong{smooth} latent field \(\eta(s)\) evaluated at fine
 #'     centroids (piecewise constant on fine polygons): spatial surface plus
-#'     optional nonlinear \(g(z)\).
+#'     optional nonlinear \eqn{g(z)}.
 #'   \item Fine intensity \(\gamma = e_f \odot \exp(\eta)\), with exposures
-#'     \(e_f\) proportional to fine area.
+#'     \eqn{e_f} proportional to fine area.
 #'   \item Simulate fine counts \(y_f \sim \mathrm{Poisson}(\gamma)\).
-#'   \item Aggregate the \emph{raw} coarse map \(y = C y_f\).
+#'   \item Aggregate the \emph{raw} coarse map \eqn{y = C y_f}.
 #' }
 #' For independent Poisson fine counts, \(y\sim\mathrm{Poisson}(C\gamma)\)
 #' marginally, matching the composite-link mean in \code{clgam()}.
@@ -83,10 +83,10 @@
 #' @param n_fine_per number of fine subpolygons \strong{per} coarse polygon
 #' @param seed RNG seed
 #' @param include_covariate logical; include a nonlinear covariate effect
-#' @param covariate_level \code{"fine"} (Case A: \(g(z_f)\)), \code{"coarse"}
-#'   (Case B: \(h(z_a)\) constant within each coarse unit), or \code{"both"}
-#'   (Case C: fine \(g\) and coarse \(h\)). Cases B/C use fine expansion of
-#'   \(z_a\) so \(\mu=\exp(\log(C\gamma)+h(z_a))\) when \(h\) is within-unit
+#' @param covariate_level \code{"fine"} (Case A: \eqn{g(z_f)}), \code{"coarse"}
+#'   (Case B: \eqn{h(z_a)} constant within each coarse unit), or \code{"both"}
+#'   (Case C: fine \eqn{g} and coarse \eqn{h}). Cases B/C use fine expansion of
+#'   \eqn{z_a} so \(\mu=\exp(\log(C\gamma)+h(z_a))\) when \eqn{h} is within-unit
 #'   constant.
 #' @param spatial_amp amplitude of the spatial field on fine centroids
 #' @param nl_amp amplitude of nonlinear effect(s); length 1 or 2 for Case C

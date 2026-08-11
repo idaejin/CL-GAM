@@ -17,7 +17,7 @@ using namespace arma;
 //' @return list b_fixed, b_random, dZtNZ, A11inv
 //' @keywords internal
 // [[Rcpp::export]]
-List sap_solve_schur_cpp(const arma::mat& XtX,
+List sop_solve_schur_cpp(const arma::mat& XtX,
                          const arma::mat& ZtX,
                          const arma::mat& ZtZ,
                          const arma::mat& ZtXtZ,

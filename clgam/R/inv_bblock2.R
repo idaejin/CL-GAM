@@ -2,7 +2,7 @@
 #'
 #' @param A11,A12,A21,A22 blocks of the partitioned matrix
 #' @return list with \code{S11}, \code{S12}, \code{S21}, \code{S22}, \code{S}
-#' @export
+#' @keywords internal
 inv_bblock2 <- function(A11, A12, A21, A22) {
   .safe_inv <- function(A) {
     A <- as.matrix(A)

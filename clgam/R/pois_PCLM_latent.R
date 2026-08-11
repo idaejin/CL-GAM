@@ -8,7 +8,7 @@
 #' \eqn{P = \lambda_1 (I\otimes D_1'D_1)+\lambda_2(D_2'D_2\otimes I)} without
 #' building the composite working design \eqn{\breve B = W^{-1}C\Gamma B}.
 #'
-#' Unlike \code{pois_SAP}, smoothing is controlled by fixed \code{lambda}
+#' Unlike \code{pois_SOP}, smoothing is controlled by fixed \code{lambda}
 #' (not SOP variance components). For irregular spatial \code{C} (Madrid),
 #' GLAM array identities for \eqn{C=C_2\otimes C_1} are not used; the latent
 #' \eqn{\tilde y} step still applies.
@@ -17,7 +17,7 @@
 #' @param x1,x2 fine-scale coordinates (length = ncol(C))
 #' @param efine fine-scale offset / exposure (default 1)
 #' @param C composition matrix (coarse × fine)
-#' @param ndx,bdeg,pord P-spline settings (same spirit as \code{pois_SAP})
+#' @param ndx,bdeg,pord P-spline settings (same spirit as \code{pois_SOP})
 #' @param lambda length-2 smoothness weights for the Kronecker penalty
 #' @param thr,maxit convergence on relative change in \eqn{\eta}
 #' @param sparse.backend passed to \code{as_comp_C}

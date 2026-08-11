@@ -6,8 +6,7 @@
 #' @param B TODO
 #'
 #' @return TODO
-#' @export
-
+#' @keywords internal
 trprod <- function(A, B){
   # Equivalent to sum(diag(A %*% B)), i.e. the trace of A %*% B
   tr <- as.numeric(crossprod(c(A), c(t(B))))

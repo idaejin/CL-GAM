@@ -9,9 +9,7 @@
 #' @return A numerical vector whose length is equal to \code{length(x)}.
 #'
 #' @seealso \code{\link{bbasis}}
-#'
-#' @export
-#'
+#' @keywords internal
 #' @examples
 #' x <- seq(0, 1, length = 100)
 #' f1 <- tpower(x = x, t = 0.2, p = 2)

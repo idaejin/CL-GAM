@@ -1,9 +1,22 @@
-#' Two-category Poisson CL-GAMM via PIRLS + SOP/SAP (legacy name)
+#' Two-category Poisson CL-GAMM via PIRLS + SOP
 #'
 #' Prefer \code{\link{clgam_contrast}} in new code.
+#' \code{pois_incat_SAP} is retained as a compatibility alias.
 #'
+#' @param y coarse counts for both groups (stacked)
+#' @param x1,x2 fine coordinates (stacked groups)
+#' @param efine fine exposures
+#' @param lcovfine optional linear covariates
+#' @param cat grouping factor of length \eqn{m}
+#' @param Ccat1,Ccat2 composition matrices per group
+#' @param x1lim,x2lim optional coordinate limits
+#' @param ndx,bdeg,pord spatial P-spline settings
+#' @param thr,maxit,parold,bold,trace,elements,decom,sparse.backend
+#'   as in \code{\link{pois_SOP}}
+#' @return A \code{"clgam"} object with group surfaces and optional difference SEs.
 #' @export
-pois_incat_SAP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, cat, Ccat1, Ccat2, x1lim = NULL, x2lim = NULL, ndx = c(15, 15), bdeg = c(3, 3), pord = c(2, 2), thr = c(1e-06, 1e-06), maxit = c(100, 100), parold = c(1, 1, 1, 1), bold = NULL, trace = FALSE, elements = FALSE, decom = 1, sparse.backend = "auto") {
+#' @seealso \code{\link{clgam_contrast}}, \code{\link{pois_SOP}}
+pois_incat_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, cat, Ccat1, Ccat2, x1lim = NULL, x2lim = NULL, ndx = c(15, 15), bdeg = c(3, 3), pord = c(2, 2), thr = c(1e-06, 1e-06), maxit = c(100, 100), parold = c(1, 1, 1, 1), bold = NULL, trace = FALSE, elements = FALSE, decom = 1, sparse.backend = "auto") {
   start.all <- proc.time()[3]
   if (is.null(x1lim)) x1lim <- .clgam_xlim(x1)
   if (is.null(x2lim)) x2lim <- .clgam_xlim(x2)
@@ -81,29 +94,29 @@ pois_incat_SAP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, cat, Ccat1,
 
   # Optimization procedure
   for (i in 1:(maxit[1])) {
-    # Set the clock for SAP
-    start.SAP <- proc.time()[3]
+    # Set the clock for SOP
+    start.SOP <- proc.time()[3]
 
     # Compute working vector
     z <- .clmm_working_z(C, gamma, eta, mu, y, groups = C_groups)
 
     # Compute CLMM matrices
     mat <- clmm_mat(C, gamma, X, Z, z, mu, groups = C_groups)
-    sap_cache <- NULL
+    sop_cache <- NULL
 
     for (it in 1:(maxit[2])) {
       # Compute penalty matrix: block diagonal matrix
       Ginv <- c((1/la[2])*g2u, (1/la[1])*g1u, (1/la[2])*g2b + (1/la[1])*g1b, (1/la[4])*g2u, (1/la[3])*g1u, (1/la[4])*g2b + (1/la[3])*g1b)
       G <- 1/Ginv
 
-      sap <- .sap_solve_schur(
+      sop <- .sop_solve_schur(
         XtX = mat$XtX, ZtX = mat$ZtX, ZtZ = mat$ZtZ,
-        ZtXtZ = mat$ZtXtZ, u = mat$u, G = G, cache = sap_cache
+        ZtXtZ = mat$ZtXtZ, u = mat$u, G = G, cache = sop_cache
       )
-      sap_cache <- sap$cache
-      b.fixed <- sap$b.fixed
-      b.random <- sap$b.random
-      dZtNZ <- sap$dZtNZ
+      sop_cache <- sop$cache
+      b.fixed <- sop$b.fixed
+      b.random <- sop$b.random
+      dZtNZ <- sop$dZtNZ
 
       # Tau 1
       G1inv.d <- (1/la[1])*G1inv.n
@@ -147,12 +160,12 @@ pois_incat_SAP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, cat, Ccat1,
       if (dla < thr[2] || (it >= 8L && dla_rel < thr[2])) break
     }
 
-    # Stop the clock for SAP
-    end.SAP <- proc.time()[3]
+    # Stop the clock for SOP
+    end.SOP <- proc.time()[3]
 
     # Print time
     if (trace) {
-      cat("Elapsed time in seconds:", c(end.SAP - start.SAP),"\n")
+      cat("Elapsed time in seconds:", c(end.SOP - start.SOP),"\n")
     }
 
     # Hold old eta
@@ -235,4 +248,8 @@ pois_incat_SAP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, cat, Ccat1,
 
   .as_clgam(out, call = match.call(), family = "contrast")
 }
+
+#' @rdname pois_incat_SOP
+#' @export
+pois_incat_SAP <- pois_incat_SOP
 

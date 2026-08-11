@@ -1,11 +1,11 @@
 #' Prefer Rcpp SOP kernels when compiled; fall back to pure R.
 #' @keywords internal
-.sap_solve_schur <- function(XtX, ZtX, ZtZ, ZtXtZ, u, G, cache = NULL) {
+.sop_solve_schur <- function(XtX, ZtX, ZtZ, ZtXtZ, u, G, cache = NULL) {
   if (isTRUE(getOption("clgam.use_rcpp", TRUE)) &&
-      exists("sap_solve_schur_cpp", mode = "function")) {
+      exists("sop_solve_schur_cpp", envir = environment(), inherits = FALSE)) {
     A11inv <- if (!is.null(cache$A11inv)) cache$A11inv else matrix(0, 0, 0)
     out <- tryCatch(
-      sap_solve_schur_cpp(XtX, ZtX, ZtZ, ZtXtZ, u, G, A11inv),
+      sop_solve_schur_cpp(XtX, ZtX, ZtZ, ZtXtZ, u, G, A11inv),
       error = function(e) NULL
     )
     if (!is.null(out)) {
@@ -17,12 +17,12 @@
       ))
     }
   }
-  .sap_solve_schur_R(XtX, ZtX, ZtZ, ZtXtZ, u, G, cache)
+  .sop_solve_schur_R(XtX, ZtX, ZtZ, ZtXtZ, u, G, cache)
 }
 
 #' Pure-R Schur SOP solve (fallback)
 #' @keywords internal
-.sap_solve_schur_R <- function(XtX, ZtX, ZtZ, ZtXtZ, u, G, cache = NULL) {
+.sop_solve_schur_R <- function(XtX, ZtX, ZtZ, ZtXtZ, u, G, cache = NULL) {
   p <- ncol(XtX)
   q <- length(G)
   u1 <- u[seq_len(p)]

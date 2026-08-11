@@ -1,6 +1,6 @@
 #' Fit a CL-GAMM (spatial / Case A--C)
 #'
-#' User-facing wrapper around \code{\link{pois_SAP}}.
+#' User-facing wrapper around \code{\link{pois_SOP}}.
 #'
 #' @param y coarse counts
 #' @param x1,x2 fine-scale spatial coordinates (or pass \code{coords})
@@ -14,7 +14,7 @@
 #' @param knots spatial knot counts (\code{ndx})
 #' @param knots_nl knot count(s) for each smooth covariate (\code{ndxnl})
 #' @param elements compute AIC/BIC/SEs (default \code{TRUE})
-#' @param ... further arguments to \code{pois_SAP} (e.g. \code{nl.basis="legacy"}
+#' @param ... further arguments to \code{pois_SOP} (e.g. \code{nl.basis="legacy"}
 #'   for archival SMiMR behaviour)
 #' @return An object of class \code{"clgam"}.
 #' @export
@@ -39,7 +39,7 @@ clgam <- function(y,
   stopifnot(!is.null(x1), !is.null(x2), !missing(C))
   dots <- list(...)
   if (is.null(dots$nl.basis)) dots$nl.basis <- "pspline"
-  out <- do.call(pois_SAP, c(list(
+  out <- do.call(pois_SOP, c(list(
     y = y, x1 = x1, x2 = x2, efine = exposure,
     lcovfine = linear, nlcovfine = smooth,
     C = C, ndx = knots, ndxnl = knots_nl, elements = elements
@@ -76,7 +76,7 @@ clgam_contrast <- function(y,
   stopifnot(n_fine %% 2L == 0L)
   n2 <- n_fine %/% 2L
   cat_fac <- factor(c(rep("g1", n2), rep("g2", n2)))
-  out <- pois_incat_SAP(
+  out <- pois_incat_SOP(
     y = y, x1 = x1, x2 = x2, efine = exposure,
     cat = cat_fac, Ccat1 = C1, Ccat2 = C2,
     ndx = knots, elements = elements, ...
@@ -86,6 +86,7 @@ clgam_contrast <- function(y,
 }
 
 #' @export
+#' @method print clgam
 print.clgam <- function(x, ...) {
   fam <- if (!is.null(x$family)) x$family else "spatial"
   cat("CL-GAMM fit (", fam, ")\n", sep = "")
@@ -104,6 +105,7 @@ print.clgam <- function(x, ...) {
 }
 
 #' @export
+#' @method summary clgam
 summary.clgam <- function(object, ...) {
   out <- list(
     call = object$call,
@@ -122,6 +124,7 @@ summary.clgam <- function(object, ...) {
 }
 
 #' @export
+#' @method print summary.clgam
 print.summary.clgam <- function(x, ...) {
   cat("Summary of CL-GAMM fit\n")
   if (!is.null(x$call)) {

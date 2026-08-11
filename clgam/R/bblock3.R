@@ -13,8 +13,7 @@
 #' @param A33 TODO
 #'
 #' @return TODO
-#' @export
-
+#' @keywords internal
 bblock3 <- function(A11, A12, A13,
                     A21, A22, A23,
                     A31, A32, A33){

@@ -12,8 +12,8 @@
 #' @param A11inv_cached optional p x p inverse of XtX (empty = compute)
 #' @return list b_fixed, b_random, dZtNZ, A11inv
 #' @keywords internal
-sap_solve_schur_cpp <- function(XtX, ZtX, ZtZ, ZtXtZ, u, G, A11inv_cached) {
-    .Call(`_clgam_sap_solve_schur_cpp`, XtX, ZtX, ZtZ, ZtXtZ, u, G, A11inv_cached)
+sop_solve_schur_cpp <- function(XtX, ZtX, ZtZ, ZtXtZ, u, G, A11inv_cached) {
+    .Call(`_clgam_sop_solve_schur_cpp`, XtX, ZtX, ZtZ, ZtXtZ, u, G, A11inv_cached)
 }
 
 #' Partition (rowsum) aggregation: C %*% (gamma * A) for 0-1 C

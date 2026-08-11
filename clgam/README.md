@@ -1,9 +1,9 @@
 # `clgam` R package
 
-Composite link **generalized additive (mixed) models** for areal counts:
+**Version 0.1.9.** Composite link **generalized additive (mixed) models** for areal counts:
 disaggregate coarse Poisson observations to a nested fine support via a composition
 matrix \(C\), with anisotropic spatial P-splines and optional fine-scale smooth
-covariates. Estimation uses PIRLS + separation of penalties (SOP/SAP).
+covariates. Estimation uses PIRLS + separation of overlapping precision matrices (SOP).
 
 This package is a clean public rewrite of the experimental `spclmm` fork used in
 the CL-GAM / Ayma line of work. **No MEDEA or other proprietary health data are
@@ -42,8 +42,9 @@ plot(fit, which = 1, sf_fine = dat$sf_fine, sf_coarse = dat$sf_coarse)
 plot(fit, which = 4, g_true = dat$g_true)
 ```
 
-Legacy paper names `pois_SAP` / `pois_incat_SAP` remain available.
-Two-group contrasts: `clgam_contrast()` (alias of `pois_incat_SAP`).
+Canonical low-level fitters: `pois_SOP` / `pois_incat_SOP`
+(legacy aliases `pois_SAP` / `pois_incat_SAP` remain available).
+Two-group contrasts: `clgam_contrast()` (wraps `pois_incat_SOP`).
 
 S3 methods: `print`, `summary`, `coef`, `fitted`, `residuals`, `predict`,
 `plot`, `AIC`, `BIC`, `logLik`, `nobs`, `deviance`.
@@ -67,7 +68,10 @@ Evaluation hierarchy (consistent with the CL-GAMM/ATA scoring notes in
 When \(\eta_{\mathrm{true}}\) is known (`simulate_ata()`), report
 **MSE/MAE of \(\hat\eta\)** on the fine support.
 If `elements=TRUE` is available, also report nominal 95% coverage of the
-pointwise \(\hat\eta \pm 1.96\,SE\) band (vs truth).
+pointwise \(\hat\eta \pm 1.96\,SE\) band (vs truth), using the
+**unconditional** SE that accounts for variance-component uncertainty
+(Wood–Pya–Säfken; `experiments/R/10_se_unconditional.R`). The default
+`fit$sd.eta` is Bayesian conditional on \(\hat\tau^2\).
 
 Do not use correlation with a noisy fine oracle (e.g. SMR) as the primary
 verdict: `cor()` can look acceptable while amplitude/shape are wrong.
@@ -79,7 +83,7 @@ the same likelihood family. Use:
 
 - Coarse Poisson deviance / log-score for \(y\) vs \(C\hat\mu\).
 - **Mass calibration**: \(\max_i |(C\hat\mu)_i - y_i|\) (and/or \(\|C\hat\mu-y\|_2\)).
-- AIC only within the same composite-link engine (e.g. `pois_SAP` variants).
+- AIC only within the same composite-link engine (e.g. `pois_SOP` variants).
 
 3) Fine diagnostics (Madrid / pennLC)
 
@@ -99,7 +103,7 @@ Method name in papers: **CL-GAM**. R package name: **`clgam`**.
 
 For the “ATP via nested ATA” narrative used in the experiments, see
 `experiments/improvements/ST_PCLM_ATA.md` (renamed to “ATP (area-to-point)” in
-plots/tables, while the underlying estimator is still `pois_SAP`).
+plots/tables, while the underlying estimator is still `pois_SOP`).
 
 ## License
 

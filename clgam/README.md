@@ -55,7 +55,7 @@ predict(fit, type = "eta", se.fit = TRUE)
 plot(fit, which = 1:3)   # eta map, obs vs fit, residuals
 ```
 
-Toggle compiled SOP kernels with `options(clgam.use_rcpp = FALSE)`.
+Toggle compiled SOP kernels with `options(clgam.use_rcpp = FALSE)` (default: compiled TRUE).
 
 ## Evaluation (simulations and models)
 

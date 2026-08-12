@@ -102,6 +102,9 @@ print.clgam <- function(x, ...) {
     print(x$call)
   }
   cat("Iterations:", x$niter, "  elapsed:", round(x$elapsed.time, 3), "s\n")
+  if (isTRUE(x$diverged)) {
+    cat("WARNING: variance-component updates diverged; fit did not converge.\n")
+  }
   cat("Variance components (tau^2):", paste(signif(x$var.comp, 4), collapse = ", "), "\n")
   if (!is.null(x$aic)) {
     cat("AIC:", paste(round(x$aic, 3), collapse = ", "))

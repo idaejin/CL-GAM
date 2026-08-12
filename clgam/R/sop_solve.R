@@ -1,11 +1,23 @@
 #' Prefer Rcpp SOP kernels when compiled; fall back to pure R.
+#'
+#' Both this and \code{.sop_solve_schur_R} cache, in addition to
+#' \code{A11inv = solve(XtX)}, the G-FREE quantities
+#' \code{N = ZtZ - ZtX \%*\% A11inv \%*\% t(ZtX)} and
+#' \code{rhs2 = u2 - ZtX \%*\% A11inv \%*\% u1}: within one outer PIRLS
+#' iteration only \code{G} (from the variance components) changes across
+#' inner SOP iterations, and \code{S = A22 - A21 A11inv A12} algebraically
+#' equals \code{N \%*\% diag(G) + I} (verified numerically), so \code{N} and
+#' \code{rhs2} need computing only once per outer iteration rather than
+#' being rebuilt (at O(q^2 p) each) on every inner iteration.
 #' @keywords internal
 .sop_solve_schur <- function(XtX, ZtX, ZtZ, ZtXtZ, u, G, cache = NULL) {
   if (isTRUE(getOption("clgam.use_rcpp", TRUE)) &&
       exists("sop_solve_schur_cpp", envir = environment(), inherits = FALSE)) {
     A11inv <- if (!is.null(cache$A11inv)) cache$A11inv else matrix(0, 0, 0)
+    N <- if (!is.null(cache$N)) cache$N else matrix(0, 0, 0)
+    rhs2 <- if (!is.null(cache$rhs2)) cache$rhs2 else numeric(0)
     out <- tryCatch(
-      sop_solve_schur_cpp(XtX, ZtX, ZtZ, ZtXtZ, u, G, A11inv),
+      sop_solve_schur_cpp(XtX, ZtX, ZtZ, ZtXtZ, u, G, A11inv, N, rhs2),
       error = function(e) NULL
     )
     if (!is.null(out)) {
@@ -13,7 +25,7 @@
         b.fixed = as.numeric(out$b.fixed),
         b.random = as.numeric(out$b.random),
         dZtNZ = as.numeric(out$dZtNZ),
-        cache = list(A11inv = out$A11inv)
+        cache = list(A11inv = out$A11inv, N = out$N, rhs2 = as.numeric(out$rhs2))
       ))
     }
   }
@@ -29,23 +41,26 @@
   u2 <- u[(p + 1L):(p + q)]
 
   A21 <- ZtX
-  A12 <- t(G * ZtX)
-  A22 <- t(G * ZtZ)
-  diag(A22) <- diag(A22) + 1
+  XtZ <- t(ZtX)
 
-  if (is.null(cache$A11inv)) {
-    cache <- list(A11inv = tryCatch(
-      solve(XtX),
-      error = function(e) MASS::ginv(XtX)
-    ))
+  have_cache <- !is.null(cache$A11inv) && !is.null(cache$N) && !is.null(cache$rhs2)
+  if (!have_cache) {
+    A11inv <- tryCatch(solve(XtX), error = function(e) MASS::ginv(XtX))
+    N <- ZtZ - A21 %*% (A11inv %*% XtZ)
+    rhs2 <- as.numeric(u2 - A21 %*% (A11inv %*% u1))
+    cache <- list(A11inv = A11inv, N = N, rhs2 = rhs2)
   }
   A11inv <- cache$A11inv
+  N <- cache$N
+  rhs2 <- cache$rhs2
 
-  A11inv_u1 <- as.numeric(A11inv %*% u1)
-  A11inv_A12 <- A11inv %*% A12
-  S <- A22 - A21 %*% A11inv_A12
-  rhs2 <- u2 - as.numeric(A21 %*% A11inv_u1)
+  # S = N %*% diag(G) + I (column rescale of the cached, G-free N).
+  S <- sweep(N, 2L, G, `*`)
+  diag(S) <- diag(S) + 1
+  A12 <- sweep(XtZ, 2L, G, `*`)
 
+  # S is generally NOT symmetric (only N is); a plain solve() (LU-based)
+  # handles that correctly, unlike a Cholesky/sympd-only method.
   Sinv <- try(solve(S), silent = TRUE)
   if (inherits(Sinv, "try-error")) {
     Sinv <- MASS::ginv(S)

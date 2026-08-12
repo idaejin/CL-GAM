@@ -105,7 +105,16 @@ logLik.clgam <- function(object, ...) {
 AIC.clgam <- function(object, ..., k = 2) {
   if (!is.null(object$aic) && isTRUE(all.equal(k, 2))) {
     a <- object$aic
-    return(if (length(a) > 1L) sum(a) else a)
+    if (length(a) > 1L) {
+      # A vector `aic` (e.g. from clgam_contrast()/pois_incat_SOP()) holds
+      # one AIC per category, each already including the FULL shared `ed`
+      # of the joint two-population fit. Summing them naively double-counts
+      # `ed`; use the precomputed joint total when available (see
+      # pois_incat_SOP.R), falling back to the old (double-counting)
+      # behaviour only for older fit objects that lack it.
+      return(if (!is.null(object$aic_total)) object$aic_total else sum(a))
+    }
+    return(a)
   }
   ll <- logLik(object)
   -2 * as.numeric(ll) + k * attr(ll, "df")
@@ -117,7 +126,13 @@ AIC.clgam <- function(object, ..., k = 2) {
 BIC.clgam <- function(object, ...) {
   if (!is.null(object$bic)) {
     b <- object$bic
-    return(if (length(b) > 1L) sum(b) else b)
+    if (length(b) > 1L) {
+      # See AIC.clgam(): per-category `bic` entries each already include the
+      # full shared `ed`; use the precomputed joint total to avoid
+      # double-counting it (and mismatched per-category log(n) terms).
+      return(if (!is.null(object$bic_total)) object$bic_total else sum(b))
+    }
+    return(b)
   }
   ll <- logLik(object)
   -2 * as.numeric(ll) + log(nobs(object)) * attr(ll, "df")

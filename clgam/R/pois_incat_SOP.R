@@ -18,9 +18,26 @@
 #' @seealso \code{\link{clgam_contrast}}, \code{\link{pois_SOP}}
 pois_incat_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, cat, Ccat1, Ccat2, x1lim = NULL, x2lim = NULL, ndx = c(15, 15), bdeg = c(3, 3), pord = c(2, 2), thr = c(1e-06, 1e-06), maxit = c(100, 100), parold = c(1, 1, 1, 1), bold = NULL, trace = FALSE, elements = FALSE, decom = 1, sparse.backend = "auto") {
   start.all <- proc.time()[3]
+  dimfine <- length(x1)
+  # The difference-surface machinery below (`elements=TRUE`: sd.dif,
+  # sd.dif2) assumes the two groups have EQUAL fine dimension and that the
+  # first half of x1/x2/efine belongs to group 1, the second half to group 2
+  # (n2 <- dimfine / 2; B[seq_len(n2),] vs B[(n2+1):dimfine,]). This was
+  # previously unchecked here (only clgam_contrast(), the recommended
+  # wrapper, enforced it) so a direct call with mismatched group sizes could
+  # silently misalign the difference surface instead of erroring.
+  if (dimfine %% 2L != 0L) {
+    stop("pois_incat_SOP: length(x1) must be even (equal-sized stacked groups).", call. = FALSE)
+  }
+  if (ncol(Ccat1) != ncol(Ccat2) || ncol(Ccat1) != dimfine / 2L) {
+    stop(
+      "pois_incat_SOP: ncol(Ccat1) and ncol(Ccat2) must both equal length(x1)/2 ",
+      "(x1/x2 must stack group 1's fine units followed by group 2's).",
+      call. = FALSE
+    )
+  }
   if (is.null(x1lim)) x1lim <- .clgam_xlim(x1)
   if (is.null(x2lim)) x2lim <- .clgam_xlim(x2)
-  dimfine <- length(x1)
   efine <- .clgam_exposure(efine, dimfine)
 
   # Build extended composition matrix (keep sparse — do not densify)
@@ -93,6 +110,7 @@ pois_incat_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, cat, Ccat1,
   la <- parold
 
   # Optimization procedure
+  diverged <- FALSE
   for (i in 1:(maxit[1])) {
     # Set the clock for SOP
     start.SOP <- proc.time()[3]
@@ -118,47 +136,55 @@ pois_incat_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, cat, Ccat1,
       b.random <- sop$b.random
       dZtNZ <- sop$dZtNZ
 
-      # Tau 1
+      # Tau 1. ED floored at a small positive constant (not just guarded
+      # against exact 0), matching pois_SOP.R.
       G1inv.d <- (1/la[1])*G1inv.n
-      ed1 <- sum(dZtNZ*(G1inv.d*(G^2)))
-      ed1 <- ifelse(ed1 == 0, 1e-50, ed1)
-      tau1 <- sum((b.random)^2*G1inv.n)/ed1
-      tau1 <- ifelse(tau1 == 0, 1e-50, tau1)
+      ed1 <- max(sum(dZtNZ*(G1inv.d*(G^2))), 1e-50)
+      tau1 <- max(sum((b.random)^2*G1inv.n)/ed1, 1e-50)
 
       # Tau 2
       G2inv.d <- (1/la[2])*G2inv.n
-      ed2 <- sum(dZtNZ*(G2inv.d*(G^2)))
-      ed2 <- ifelse(ed2 == 0, 1e-50, ed2)
-      tau2 <- sum((b.random)^2*G2inv.n)/ed2
-      tau2 <- ifelse(tau2 == 0, 1e-50, tau2)
+      ed2 <- max(sum(dZtNZ*(G2inv.d*(G^2))), 1e-50)
+      tau2 <- max(sum((b.random)^2*G2inv.n)/ed2, 1e-50)
 
       # Tau 3
       G3inv.d <- (1/la[3])*G3inv.n
-      ed3 <- sum(dZtNZ*(G3inv.d*(G^2)))
-      ed3 <- ifelse(ed3 == 0, 1e-50, ed3)
-      tau3 <- sum((b.random)^2*G3inv.n)/ed3
-      tau3 <- ifelse(tau3 == 0, 1e-50, tau3)
+      ed3 <- max(sum(dZtNZ*(G3inv.d*(G^2))), 1e-50)
+      tau3 <- max(sum((b.random)^2*G3inv.n)/ed3, 1e-50)
 
       # Tau 4
       G4inv.d <- (1/la[4])*G4inv.n
-      ed4 <- sum(dZtNZ*(G4inv.d*(G^2)))
-      ed4 <- ifelse(ed4 == 0, 1e-50, ed4)
-      tau4 <- sum((b.random)^2*G4inv.n)/ed4
-      tau4 <- ifelse(tau4 == 0, 1e-50, tau4)
+      ed4 <- max(sum(dZtNZ*(G4inv.d*(G^2))), 1e-50)
+      tau4 <- max(sum((b.random)^2*G4inv.n)/ed4, 1e-50)
 
       # New variance components and convergence check
       lanew <- c(tau1, tau2, tau3, tau4)
       dla <- mean(abs(la - lanew))
       # Early exit when relative change is already tiny (avoids grinding to maxit=100)
       dla_rel <- mean(abs(la - lanew) / pmax(abs(la), abs(lanew), 1e-8))
-      la <- lanew
 
       if (trace){
         cat(sprintf("%1$3d %2$10.6f", it, dla))
         cat(sprintf("%8.3f", c(ed1, ed2, ed3, ed4)), "\n")
       }
+      # See pois_SOP.R: check finiteness of the candidate update BEFORE
+      # committing it to `la`, so a divergent tau cannot silently corrupt the
+      # next outer PIRLS iteration. This function previously had no such
+      # guard at all.
+      if (!all(is.finite(lanew)) || !is.finite(dla) || !is.finite(dla_rel)) {
+        warning(
+          "clgam_contrast: non-finite variance-component update at outer ",
+          "iteration ", i, ", inner iteration ", it,
+          "; keeping the last finite estimate and stopping (fit not converged).",
+          call. = FALSE
+        )
+        diverged <- TRUE
+        break
+      }
+      la <- lanew
       if (dla < thr[2] || (it >= 8L && dla_rel < thr[2])) break
     }
+    if (diverged) break
 
     # Stop the clock for SOP
     end.SOP <- proc.time()[3]
@@ -192,9 +218,10 @@ pois_incat_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, cat, Ccat1,
 
   dev.cat2 <- 2*sum(y[-c(1:nrow(Ccat1))]*log(ifelse(y[-c(1:nrow(Ccat1))] == 0, 1, y[-c(1:nrow(Ccat1))]/mu[-c(1:nrow(Ccat1))])) - (y[-c(1:nrow(Ccat1))] - mu[-c(1:nrow(Ccat1))]))
 
-  # Obtain inverse of G
+  # Obtain inverse of G (see pois_SOP.R: sparse Diagonal avoids an
+  # unnecessary dense q x q allocation for a structurally diagonal quantity)
   ginvsp <- c((1/la[2])*g2u, (1/la[1])*g1u, (1/la[2])*g2b + (1/la[1])*g1b, (1/la[4])*g2u, (1/la[3])*g1u, (1/la[4])*g2b + (1/la[3])*g1b)
-  Ginv <- diag(ginvsp, nrow = length(ginvsp))
+  Ginv <- Matrix::Diagonal(x = ginvsp)
 
   end.all <- proc.time()[3]
   comp.time <- end.all - start.all
@@ -208,6 +235,7 @@ pois_incat_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, cat, Ccat1,
     eta = eta, gamma = gamma, mu = mu,
     var.comp = la, edf = c(ed1, ed2, ed3, ed4),
     niter = i, elapsed.time = comp.time,
+    diverged = diverged,
     dev = c(dev.cat1, dev.cat2),
     b.fixed = b.fixed, b.random = b.random,
     matlist = list(
@@ -224,8 +252,17 @@ pois_incat_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, cat, Ccat1,
     M1 <- inv_bblock2(opt.mat$XtX, opt.mat$XtZ, opt.mat$ZtX, ZtZpen)
     M2 <- bblock2(opt.mat$XtX, opt.mat$XtZ, opt.mat$ZtX, opt.mat$ZtZ)
     ed <- trprod(M1$S, M2)
+    # Per-category AIC/BIC (aic1, aic2) each add the FULL shared `ed`, because
+    # both categories are fitted jointly with one mixed-model system and one
+    # effective-dimension trace. They are diagnostic per-group summaries, not
+    # independent quantities: summing them (as a naive AIC()/BIC() generic
+    # might) double-counts `ed`. `aic_total`/`bic_total` below use the correct
+    # single `ed` for the joint two-population model and are what
+    # AIC.clgam()/BIC.clgam() use for a "clgam_contrast" fit (see
+    # clgam-methods.R).
     aic1 <- dev.cat1 + 2 * ed
     aic2 <- dev.cat2 + 2 * ed
+    n_total <- length(y)
     bic1 <- dev.cat1 + log(length(y[seq_len(nrow(Ccat1))])) * ed
     bic2 <- dev.cat2 + log(length(y[-seq_len(nrow(Ccat1))])) * ed
     sd.eta <- sqrt(
@@ -241,6 +278,8 @@ pois_incat_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, cat, Ccat1,
     out$ed <- ed
     out$aic <- c(aic1, aic2)
     out$bic <- c(bic1, bic2)
+    out$aic_total <- dev.cat1 + dev.cat2 + 2 * ed
+    out$bic_total <- dev.cat1 + dev.cat2 + log(n_total) * ed
     out$sd.eta <- sd.eta
     out$sd.dif <- sd.dif
     out$sd.dif2 <- sd.dif2

@@ -3,6 +3,26 @@
 
 #' Schur SOP solve + ED diagonal (Ayma nonsymmetric system)
 #'
+#' Algebraic note (verified numerically, see clgam SOP review notes): with
+#' A12 = XtZ %*% diag(G), A22 = ZtZ %*% diag(G) + I (both G-dependent), and
+#' A11inv fixed,
+#'   S = A22 - ZtX %*% A11inv %*% A12 = N %*% diag(G) + I,
+#'   rhs2 = u2 - ZtX %*% A11inv %*% u1,
+#' where N = ZtZ - ZtX %*% A11inv %*% XtZ and rhs2 do NOT depend on G at
+#' all. Within one outer PIRLS iteration only G changes across inner SOP
+#' iterations (XtX, ZtX, ZtZ, u come from the working system formed once
+#' before the inner loop), so N and rhs2 are computed once (when the cache
+#' is empty) and reused: forming S per inner iteration drops from two
+#' O(q^2 p) matrix products to one O(q^2) column rescale.
+#'
+#' Also note S = N %*% diag(G) + I is NOT symmetric in general (only if G
+#' is constant), even though N itself is symmetric -- confirmed
+#' numerically (||S - t(S)|| was large, not zero, on random test inputs).
+#' The previous version solved it via `solve_opts::likely_sympd`, which
+#' assumes symmetry; this version uses a general (LU-based) inverse, which
+#' is correct regardless of symmetry and matches what the pure-R fallback
+#' (`.sop_solve_schur_R`, plain `solve()`) has always done.
+#'
 #' @param XtX p x p
 #' @param ZtX q x p
 #' @param ZtZ q x q
@@ -10,10 +30,12 @@
 #' @param u length p+q
 #' @param G length q (1/Ginv)
 #' @param A11inv_cached optional p x p inverse of XtX (empty = compute)
-#' @return list b_fixed, b_random, dZtNZ, A11inv
+#' @param N_cached optional q x q G-free Schur complement (empty = compute)
+#' @param rhs2_cached optional length-q G-free RHS (empty = compute)
+#' @return list b_fixed, b_random, dZtNZ, A11inv, N, rhs2
 #' @keywords internal
-sop_solve_schur_cpp <- function(XtX, ZtX, ZtZ, ZtXtZ, u, G, A11inv_cached) {
-    .Call(`_clgam_sop_solve_schur_cpp`, XtX, ZtX, ZtZ, ZtXtZ, u, G, A11inv_cached)
+sop_solve_schur_cpp <- function(XtX, ZtX, ZtZ, ZtXtZ, u, G, A11inv_cached, N_cached, rhs2_cached) {
+    .Call(`_clgam_sop_solve_schur_cpp`, XtX, ZtX, ZtZ, ZtXtZ, u, G, A11inv_cached, N_cached, rhs2_cached)
 }
 
 #' Partition (rowsum) aggregation: C %*% (gamma * A) for 0-1 C

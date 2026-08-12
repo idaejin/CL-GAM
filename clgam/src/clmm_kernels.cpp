@@ -7,6 +7,26 @@ using namespace arma;
 
 //' Schur SOP solve + ED diagonal (Ayma nonsymmetric system)
 //'
+//' Algebraic note (verified numerically, see clgam SOP review notes): with
+//' A12 = XtZ %*% diag(G), A22 = ZtZ %*% diag(G) + I (both G-dependent), and
+//' A11inv fixed,
+//'   S = A22 - ZtX %*% A11inv %*% A12 = N %*% diag(G) + I,
+//'   rhs2 = u2 - ZtX %*% A11inv %*% u1,
+//' where N = ZtZ - ZtX %*% A11inv %*% XtZ and rhs2 do NOT depend on G at
+//' all. Within one outer PIRLS iteration only G changes across inner SOP
+//' iterations (XtX, ZtX, ZtZ, u come from the working system formed once
+//' before the inner loop), so N and rhs2 are computed once (when the cache
+//' is empty) and reused: forming S per inner iteration drops from two
+//' O(q^2 p) matrix products to one O(q^2) column rescale.
+//'
+//' Also note S = N %*% diag(G) + I is NOT symmetric in general (only if G
+//' is constant), even though N itself is symmetric -- confirmed
+//' numerically (||S - t(S)|| was large, not zero, on random test inputs).
+//' The previous version solved it via `solve_opts::likely_sympd`, which
+//' assumes symmetry; this version uses a general (LU-based) inverse, which
+//' is correct regardless of symmetry and matches what the pure-R fallback
+//' (`.sop_solve_schur_R`, plain `solve()`) has always done.
+//'
 //' @param XtX p x p
 //' @param ZtX q x p
 //' @param ZtZ q x q
@@ -14,7 +34,9 @@ using namespace arma;
 //' @param u length p+q
 //' @param G length q (1/Ginv)
 //' @param A11inv_cached optional p x p inverse of XtX (empty = compute)
-//' @return list b_fixed, b_random, dZtNZ, A11inv
+//' @param N_cached optional q x q G-free Schur complement (empty = compute)
+//' @param rhs2_cached optional length-q G-free RHS (empty = compute)
+//' @return list b_fixed, b_random, dZtNZ, A11inv, N, rhs2
 //' @keywords internal
 // [[Rcpp::export]]
 List sop_solve_schur_cpp(const arma::mat& XtX,
@@ -23,45 +45,53 @@ List sop_solve_schur_cpp(const arma::mat& XtX,
                          const arma::mat& ZtXtZ,
                          const arma::vec& u,
                          const arma::vec& G,
-                         const arma::mat& A11inv_cached) {
+                         const arma::mat& A11inv_cached,
+                         const arma::mat& N_cached,
+                         const arma::vec& rhs2_cached) {
   const uword p = XtX.n_cols;
   const uword q = G.n_elem;
-
-  arma::mat A11inv;
-  if (A11inv_cached.n_elem == 0) {
-    if (!inv_sympd(A11inv, XtX)) {
-      A11inv = pinv(XtX);
-    }
-  } else {
-    A11inv = A11inv_cached;
-  }
-
-  // A12 = t(diag(G) * ZtX); A21 = ZtX; A22 = t(diag(G) * ZtZ) + I
-  arma::mat GZ = ZtX.each_col() % G;   // diag(G) %*% ZtX
-  arma::mat A12 = GZ.t();              // p x q
-  const arma::mat& A21 = ZtX;          // q x p
-  arma::mat A22 = (ZtZ.each_col() % G).t();
-  A22.diag() += 1.0;
 
   arma::vec u1 = u.head(p);
   arma::vec u2 = u.tail(q);
 
-  arma::mat A11inv_A12 = A11inv * A12;
-  arma::mat S = A22 - A21 * A11inv_A12;
-  arma::vec rhs2 = u2 - A21 * (A11inv * u1);
+  const bool have_cache = (A11inv_cached.n_elem > 0) &&
+                           (N_cached.n_elem > 0) &&
+                           (rhs2_cached.n_elem > 0);
+
+  arma::mat A11inv;
+  arma::mat N;
+  arma::vec rhs2;
+  arma::mat XtZ = ZtX.t();
+
+  if (!have_cache) {
+    if (!inv_sympd(A11inv, XtX)) {
+      A11inv = pinv(XtX);
+    }
+    N = ZtZ - ZtX * (A11inv * XtZ);
+    rhs2 = u2 - ZtX * (A11inv * u1);
+  } else {
+    A11inv = A11inv_cached;
+    N = N_cached;
+    rhs2 = rhs2_cached;
+  }
+
+  // S = N %*% diag(G) + I (column-wise rescale of the cached, G-free N).
+  arma::mat S = N.each_row() % G.t();
+  S.diag() += 1.0;
+
+  // A12 = XtZ %*% diag(G) (p x q), still needed for b1; cheap (O(p*q)).
+  arma::mat A12 = XtZ.each_row() % G.t();
 
   arma::mat Sinv;
-  arma::vec b2;
-  arma::mat I = eye(q, q);
-  if (!solve(Sinv, S, I, solve_opts::likely_sympd + solve_opts::no_approx)) {
+  if (!inv(Sinv, S)) {
     Sinv = pinv(S);
   }
-  b2 = Sinv * rhs2;
+  arma::vec b2 = Sinv * rhs2;
 
   arma::vec b1 = A11inv * (u1 - A12 * b2);
 
-  // H22 = Sinv, H21 = -Sinv * A21 * A11inv
-  arma::mat H21 = -Sinv * (A21 * A11inv);
+  // H22 = Sinv, H21 = -Sinv * ZtX * A11inv
+  arma::mat H21 = -Sinv * (ZtX * A11inv);
   arma::mat H_bottom = join_horiz(H21, Sinv); // q x (p+q)
 
   // dZtNZ[j] = sum_k H_bottom(j,k) * ZtXtZ(k,j)
@@ -76,7 +106,9 @@ List sop_solve_schur_cpp(const arma::mat& XtX,
     Named("b.fixed") = b1,
     Named("b.random") = b_random,
     Named("dZtNZ") = dZtNZ,
-    Named("A11inv") = A11inv
+    Named("A11inv") = A11inv,
+    Named("N") = N,
+    Named("rhs2") = rhs2
   );
 }
 

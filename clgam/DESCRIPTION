@@ -1,7 +1,7 @@
 Package: clgam
 Type: Package
 Title: Composite Link Generalized Additive (Mixed) Models
-Version: 0.1.11
+Version: 0.1.12
 Authors@R: c(
     person("Diego", "Ayma Anza", role = "aut",
            email = "dayma@est-econ.uc3m.es"),

@@ -1,3 +1,17 @@
+# clgam 0.1.12
+
+* Correctness and robustness from code review: AIC/BIC no longer
+  double-count shared `ed` on contrast fits; non-finite variance-component
+  updates abort with `warning()` and `fit$diverged`; `pois_incat_SOP()`
+  validates matching fine dimensions; linear-covariate SEs
+  (`sdleffects`) use the same PIRLS-weighted Bayesian covariance as
+  nonlinear SEs when `elements=TRUE`.
+* Performance: sparse `Diagonal` for `Ginv`; `mm_basis()` uses
+  `eigen(..., symmetric=TRUE)`; SOP Schur solver caches G-free blocks
+  across inner iterations and uses a general solve for `S` (not
+  `likely_sympd`; `S` is not symmetric in general).
+* New regression tests in `tests/testthat/test-fixes.R`.
+
 # clgam 0.1.11
 
 * Identifiability projection (`orth.smooth`) now uses the space of

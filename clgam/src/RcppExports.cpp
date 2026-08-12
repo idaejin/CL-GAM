@@ -12,8 +12,8 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
 // sop_solve_schur_cpp
-List sop_solve_schur_cpp(const arma::mat& XtX, const arma::mat& ZtX, const arma::mat& ZtZ, const arma::mat& ZtXtZ, const arma::vec& u, const arma::vec& G, const arma::mat& A11inv_cached);
-RcppExport SEXP _clgam_sop_solve_schur_cpp(SEXP XtXSEXP, SEXP ZtXSEXP, SEXP ZtZSEXP, SEXP ZtXtZSEXP, SEXP uSEXP, SEXP GSEXP, SEXP A11inv_cachedSEXP) {
+List sop_solve_schur_cpp(const arma::mat& XtX, const arma::mat& ZtX, const arma::mat& ZtZ, const arma::mat& ZtXtZ, const arma::vec& u, const arma::vec& G, const arma::mat& A11inv_cached, const arma::mat& N_cached, const arma::vec& rhs2_cached);
+RcppExport SEXP _clgam_sop_solve_schur_cpp(SEXP XtXSEXP, SEXP ZtXSEXP, SEXP ZtZSEXP, SEXP ZtXtZSEXP, SEXP uSEXP, SEXP GSEXP, SEXP A11inv_cachedSEXP, SEXP N_cachedSEXP, SEXP rhs2_cachedSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -24,7 +24,9 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const arma::vec& >::type u(uSEXP);
     Rcpp::traits::input_parameter< const arma::vec& >::type G(GSEXP);
     Rcpp::traits::input_parameter< const arma::mat& >::type A11inv_cached(A11inv_cachedSEXP);
-    rcpp_result_gen = Rcpp::wrap(sop_solve_schur_cpp(XtX, ZtX, ZtZ, ZtXtZ, u, G, A11inv_cached));
+    Rcpp::traits::input_parameter< const arma::mat& >::type N_cached(N_cachedSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type rhs2_cached(rhs2_cachedSEXP);
+    rcpp_result_gen = Rcpp::wrap(sop_solve_schur_cpp(XtX, ZtX, ZtZ, ZtXtZ, u, G, A11inv_cached, N_cached, rhs2_cached));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -71,7 +73,7 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_clgam_sop_solve_schur_cpp", (DL_FUNC) &_clgam_sop_solve_schur_cpp, 7},
+    {"_clgam_sop_solve_schur_cpp", (DL_FUNC) &_clgam_sop_solve_schur_cpp, 9},
     {"_clgam_comp_mul_groups_cpp", (DL_FUNC) &_clgam_comp_mul_groups_cpp, 4},
     {"_clgam_clmm_crossprod_cpp", (DL_FUNC) &_clgam_clmm_crossprod_cpp, 4},
     {"_clgam_btWb_cpp", (DL_FUNC) &_clgam_btWb_cpp, 3},

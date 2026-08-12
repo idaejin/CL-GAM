@@ -266,6 +266,7 @@ pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL,
   }
 
   # Optimization procedure
+  diverged <- FALSE
   for (i in 1:(maxit[1])) {
     # Set the clock for SOP
     start.SOP <- proc.time()[3]
@@ -295,17 +296,17 @@ pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL,
       b.random <- sop$b.random
       dZtNZ <- sop$dZtNZ
 
-      # Tau 1
+      # Tau 1. ED is floored at a small positive constant (not just guarded
+      # against exact 0) so a numerically-near-zero-but-nonzero ED cannot
+      # still send tau1 to Inf/NaN.
       G1inv.d <- (1/la[1])*G1inv.n
-      ed1 <- sum(dZtNZ*(G1inv.d*G^2))
-      ed1 <- ifelse(ed1 == 0, 1e-50,ed1)
+      ed1 <- max(sum(dZtNZ*(G1inv.d*G^2)), 1e-50)
       tau1 <- sum(b.random^2 * G1inv.n) / ed1
       tau1 <- max(tau1, 1e-50)
 
       # Tau 2
       G2inv.d <- (1 / la[2]) * G2inv.n
-      ed2 <- sum(dZtNZ * (G2inv.d * G^2))
-      ed2 <- ifelse(ed2 == 0, 1e-50, ed2)
+      ed2 <- max(sum(dZtNZ * (G2inv.d * G^2)), 1e-50)
       tau2 <- sum(b.random^2 * G2inv.n) / ed2
       tau2 <- max(tau2, 1e-50)
 
@@ -315,8 +316,7 @@ pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL,
         edk <- tauk
         for (k in 1:nk) {
           Gkinv.d <- (1 / la[(k + 2)]) * Gkinv.n[[k]]
-          edk[k] <- sum(dZtNZ * (Gkinv.d * G^2))
-          edk[k] <- ifelse(edk[k] == 0, 1e-50, edk[k])
+          edk[k] <- max(sum(dZtNZ * (Gkinv.d * G^2)), 1e-50)
           tauk[k] <- sum(b.random^2 * Gkinv.n[[k]]) / edk[k]
           tauk[k] <- max(tauk[k], 1e-50)
         }
@@ -330,7 +330,6 @@ pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL,
       dla <- mean(abs(la - lanew))
       # Early exit when relative change is already tiny (avoids grinding to maxit=100)
       dla_rel <- mean(abs(la - lanew) / pmax(abs(la), abs(lanew), 1e-8))
-      la <- lanew
 
       if (trace) {
         if (!is.null(nlcovfine)) {
@@ -341,9 +340,27 @@ pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL,
           cat(sprintf("%8.3f", c(ed1, ed2)), "\n")
         }
       }
-      if (!is.finite(dla) || !is.finite(dla_rel)) break
+      # Check finiteness of the CANDIDATE update before committing it to `la`.
+      # Previously `la <- lanew` ran unconditionally before this check, so a
+      # divergent tau (Inf/NaN) could be written into `la` and silently
+      # propagate into the next outer PIRLS iteration's penalty. Now: on a
+      # non-finite update we keep the last finite `la` (and the b.fixed /
+      # b.random already computed with it, which are still valid), warn once,
+      # and stop both loops.
+      if (!all(is.finite(lanew)) || !is.finite(dla) || !is.finite(dla_rel)) {
+        warning(
+          "clgam: non-finite variance-component update at outer iteration ",
+          i, ", inner iteration ", it,
+          "; keeping the last finite estimate and stopping (fit not converged).",
+          call. = FALSE
+        )
+        diverged <- TRUE
+        break
+      }
+      la <- lanew
       if (dla < thr[2] || (it >= 8L && dla_rel < thr[2])) break
     }
+    if (diverged) break
 
     # Stop the clock for SOP
     end.SOP <- proc.time()[3]
@@ -382,7 +399,12 @@ pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL,
       ginvsp <- c(ginvsp, (1/la[(k+2)])*dk[[k]])
     }
   }
-  Ginv <- diag(ginvsp, nrow = length(ginvsp))
+  # Stored only for inspection (no internal code path reads matlist$Ginv);
+  # ginvsp is structurally diagonal, so a dense q x q diag() here wastes
+  # O(q^2) memory (q = number of penalized coefficients, can be in the
+  # hundreds+) for what is a length-q vector. Matrix::Diagonal keeps the same
+  # `[i,j]`/`%*%`-compatible matrix semantics without materialising it densely.
+  Ginv <- Matrix::Diagonal(x = ginvsp)
 
   # Effective degrees of freedom
   edf <- c(ed1, ed2)
@@ -390,35 +412,16 @@ pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL,
     edf <- c(edf, edk)
   }
 
-  # Compute linear effects and standard deviations
+  # Compute linear- and non-linear-effect POINT ESTIMATES (always; cheap
+  # matrix-vector products, independent of `elements`).
   if (!is.null(lcovfine)) {
-    # Linear effects
     leffects <- matrix(0, dimfine, ncol(lcovfine))
-    for (k in 1:ncol(lcovfine)){
-      leffects[,k] <- c(X[,(k+4)]*b.fixed[(k+4)])
-    }
-    # Associated standard deviations (ginv if Gram is rank-deficient)
-    Cmat <- cbind(X, Z)
-    Gmat <- diag(c(rep(0, np[1]), ginvsp))
-    Rmat <- tryCatch(
-      solve(crossprod(Cmat) + Gmat),
-      error = function(e) MASS::ginv(as.matrix(crossprod(Cmat) + Gmat))
-    )
-    sdleffects <- matrix(0, dimfine, ncol(lcovfine))
     for (k in 1:ncol(lcovfine)) {
-      onesk <- rep(0, ncol(Cmat))
-      # Ones of the fixed part
-      onesk[(k+4)] <- 1
-      Ckmat <- Cmat %*% diag(onesk)
-      covkmat <- Ckmat %*% Rmat %*% t(Ckmat)
-      sdleffects[, k] <- sqrt(pmax(diag(covkmat), 0))
+      leffects[, k] <- c(X[, (k + 4)] * b.fixed[(k + 4)])
     }
   } else {
     leffects <- NULL
-    sdleffects <- NULL
   }
-
-  # Compute non-linear effects and standard deviations
   if (!is.null(nlcovfine)) {
     nleffects <- matrix(0, dimfine, nk)
     for (k in 1:nk) {
@@ -432,29 +435,52 @@ pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL,
       }
       nleffects[, k] <- fixed_part + as.numeric(Zxk[[k]] %*% b.random[low:sup])
     }
-    # Coefficient covariance (Bayesian, VC plugged in). Prefer the PIRLS
-    # weighted Hessian when available below; here a fallback Gram is built
-    # and overwritten if elements=TRUE.
+  } else {
+    nleffects <- NULL
+  }
+
+  # Standard errors. When elements=TRUE, the block below (PIRLS-weighted
+  # Bayesian covariance M1$S) is strictly better and computed once for BOTH
+  # linear and smooth effects; the unweighted-Gram fallback here is then
+  # unnecessary. Building it anyway (as earlier versions did, independently
+  # for leffects and again for nleffects) meant factorising the same dense
+  # (p+q)x(p+q) matrix crossprod(Cmat)+Gmat up to twice per fit and
+  # discarding the result when elements=TRUE -- computed here only when
+  # actually needed, and only once.
+  sdleffects <- NULL
+  sdnleffects <- NULL
+  if ((!is.null(lcovfine) || !is.null(nlcovfine)) && !isTRUE(elements)) {
     Cmat <- cbind(X, Z)
     Gmat <- diag(c(rep(0, np[1]), ginvsp))
     Rmat <- tryCatch(
       solve(crossprod(Cmat) + Gmat),
       error = function(e) MASS::ginv(as.matrix(crossprod(Cmat) + Gmat))
     )
-    sdnleffects <- matrix(0, dimfine, nk)
-    for (k in 1:nk) {
-      idx <- nl_fixed_idx[[k]]
-      low <- sum(np[2:(k + 3)]) + 1
-      sup <- low + np[k + 4] - 1
-      sel <- c(idx, np[1] + low:sup)
-      Cg <- Cmat[, sel, drop = FALSE]
-      Sg <- Rmat[sel, sel, drop = FALSE]
-      # Sum-to-zero / centred SE (matches centred g plots; drops level uncertainty)
-      sdnleffects[, k] <- .se_smooth_centered(Cg, Sg)
+    if (!is.null(lcovfine)) {
+      sdleffects <- matrix(0, dimfine, ncol(lcovfine))
+      for (k in 1:ncol(lcovfine)) {
+        # Var(X[,j]*beta_j) = X[,j]^2 * Var(beta_j); the column selector used
+        # to have only one nonzero entry, so forming the full dimfine x
+        # dimfine covariance matrix (as an earlier version did, via
+        # Cmat %*% diag(onesk) %*% Rmat %*% t(...)) just to read off its
+        # diagonal was O(dimfine^2) for an O(dimfine) quantity.
+        j <- k + 4
+        sdleffects[, k] <- abs(X[, j]) * sqrt(max(Rmat[j, j], 0))
+      }
     }
-  } else {
-    nleffects <- NULL
-    sdnleffects <- NULL
+    if (!is.null(nlcovfine)) {
+      sdnleffects <- matrix(0, dimfine, nk)
+      for (k in 1:nk) {
+        idx <- nl_fixed_idx[[k]]
+        low <- sum(np[2:(k + 3)]) + 1
+        sup <- low + np[k + 4] - 1
+        sel <- c(idx, np[1] + low:sup)
+        Cg <- Cmat[, sel, drop = FALSE]
+        Sg <- Rmat[sel, sel, drop = FALSE]
+        # Sum-to-zero / centred SE (matches centred g plots; drops level uncertainty)
+        sdnleffects[, k] <- .se_smooth_centered(Cg, Sg)
+      }
+    }
   }
 
   end.all <- proc.time()[3]
@@ -468,6 +494,7 @@ pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL,
     lcovfine = lcovfine, nlcovfine = nlcovfine,
     eta = eta, gamma = gamma, mu = mu,
     var.comp = la, edf = edf, niter = i, elapsed.time = comp.time,
+    diverged = diverged,
     dev = dev, b.fixed = b.fixed, b.random = b.random,
     matlist = list(
       B1 = MM1$B, B2 = MM2$B, D1 = MM1$D, D2 = MM2$D,
@@ -501,25 +528,40 @@ pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL,
     out$sd.eta <- sd.eta
     out$sd.exp.eta <- sd.eta * exp(eta)
 
-    # Overwrite smooth SEs with PIRLS Bayesian covariance (unweighted Gram
-    # fallback above can collapse for multiple orth.smooth blocks).
-    if (!is.null(nlcovfine) && nk > 0L) {
+    # Standard errors from the PIRLS-weighted Bayesian covariance, computed
+    # once and shared by BOTH linear and smooth effects. Previously only
+    # sdnleffects was upgraded here; sdleffects (linear covariates) silently
+    # kept the cruder unweighted-Gram fallback SE even when elements=TRUE,
+    # an inconsistency between the two effect types with no test coverage.
+    if ((!is.null(lcovfine) || !is.null(nlcovfine))) {
       Vp <- rbind(
         cbind(M1$S11, M1$S12),
         cbind(M1$S21, M1$S22)
       )
       Cmat <- cbind(X, Z)
-      sdnleffects <- matrix(0, dimfine, nk)
-      for (k in 1:nk) {
-        idx <- nl_fixed_idx[[k]]
-        low <- sum(np[2:(k + 3)]) + 1
-        sup <- low + np[k + 4] - 1
-        sel <- c(idx, np[1] + low:sup)
-        Cg <- Cmat[, sel, drop = FALSE]
-        Sg <- Vp[sel, sel, drop = FALSE]
-        sdnleffects[, k] <- .se_smooth_centered(Cg, Sg)
+      if (!is.null(lcovfine)) {
+        sdleffects <- matrix(0, dimfine, ncol(lcovfine))
+        for (k in 1:ncol(lcovfine)) {
+          # See the non-elements branch above: Var(X[,j]*beta_j) =
+          # X[,j]^2 * Var(beta_j) directly, no dimfine x dimfine matrix needed.
+          j <- k + 4
+          sdleffects[, k] <- abs(X[, j]) * sqrt(max(Vp[j, j], 0))
+        }
+        out$sdleffects <- sdleffects
       }
-      out$sdnleffects <- sdnleffects
+      if (!is.null(nlcovfine) && nk > 0L) {
+        sdnleffects <- matrix(0, dimfine, nk)
+        for (k in 1:nk) {
+          idx <- nl_fixed_idx[[k]]
+          low <- sum(np[2:(k + 3)]) + 1
+          sup <- low + np[k + 4] - 1
+          sel <- c(idx, np[1] + low:sup)
+          Cg <- Cmat[, sel, drop = FALSE]
+          Sg <- Vp[sel, sel, drop = FALSE]
+          sdnleffects[, k] <- .se_smooth_centered(Cg, Sg)
+        }
+        out$sdnleffects <- sdnleffects
+      }
     }
   }
 

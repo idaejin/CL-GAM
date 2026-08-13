@@ -1,7 +1,7 @@
 # CL-GAM (R package `clgam`)
 
-Public R package for composite-link generalized additive (mixed) models.
-The installable package lives in [`clgam/`](clgam/).
+Composite-link GAMMs for nested areal counts. The installable package is
+[`clgam/`](clgam/) (version **0.1.25**).
 
 ## Install
 
@@ -9,15 +9,20 @@ The installable package lives in [`clgam/`](clgam/).
 remotes::install_github("idaejin/CL-GAM", subdir = "clgam")
 ```
 
-From a local clone:
+From a local clone of this repository:
 
 ```r
 install.packages("clgam", repos = NULL, type = "source")
-# or, from inside clgam/:
-# install.packages(".", repos = NULL, type = "source")
 ```
 
-Usage, API, and examples: [`clgam/README.md`](clgam/README.md).
+From inside `clgam/`:
+
+```r
+install.packages(".", repos = NULL, type = "source")
+```
+
+API, formula interface (`s(x1, x2, ndx, bdeg, pord)`), and examples:
+[`clgam/README.md`](clgam/README.md).
 
 ## License
 

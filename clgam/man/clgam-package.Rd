@@ -21,6 +21,7 @@ Useful links:
 
 Authors:
 \itemize{
+  \item Dae-Jin Lee \email{dae-jin.lee@ie.edu}
   \item Diego Ayma Anza \email{dayma@est-econ.uc3m.es}
 }
 

@@ -2,7 +2,7 @@
 % Please edit documentation in R/pois_PCLM_latent.R
 \name{pois_PCLM_latent}
 \alias{pois_PCLM_latent}
-\title{Penalized CLM via Camarda–Durbán latent working response}
+\title{Penalized CLM via Camarda-Durban latent working response}
 \usage{
 pois_PCLM_latent(
   y,
@@ -29,11 +29,13 @@ pois_PCLM_latent(
 
 \item{efine}{fine-scale offset / exposure (default 1)}
 
-\item{C}{composition matrix (coarse × fine)}
+\item{C}{composition matrix (coarse x fine)}
 
 \item{ndx, bdeg, pord}{P-spline settings (same spirit as \code{pois_SOP})}
 
 \item{lambda}{length-2 smoothness weights for the Kronecker penalty}
+
+\item{x1lim, x2lim}{optional coordinate limits}
 
 \item{thr, maxit}{convergence on relative change in \eqn{\eta}}
 
@@ -42,10 +44,10 @@ pois_PCLM_latent(
 \item{trace}{print iteration info}
 }
 \value{
-list with \code{eta}, \code{gamma}, \code{mu}, \code{alpha}, \code{dev}, …
+list with \code{eta}, \code{gamma}, \code{mu}, \code{alpha}, \code{dev}, ...
 }
 \description{
-Implements the iterative scheme of Camarda & Durbán
+Implements the iterative scheme of Camarda & Durban
 (\url{https://arxiv.org/abs/2412.04956}): redistribute aggregated counts to a
 fine-scale working response
 \eqn{\tilde y = \gamma \odot (C^\top (y \oslash \mu))}, then update
@@ -60,7 +62,7 @@ GLAM array identities for \eqn{C=C_2\otimes C_1} are not used; the latent
 \eqn{\tilde y} step still applies.
 }
 \references{
-Camarda, C. G. and Durbán, M. (2025).
+Camarda, C. G. and Durban, M. (2025).
 Fast Estimation of the Composite Link Model for Multidimensional Grouped Counts.
 \emph{arXiv}:2412.04956.
 }

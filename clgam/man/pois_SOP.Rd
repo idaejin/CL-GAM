@@ -32,7 +32,8 @@ pois_SOP(
   sparse.backend = "auto",
   nl.basis = c("legacy", "pspline"),
   orth.smooth = NULL,
-  nl.level = NULL
+  nl.level = NULL,
+  family = stats::poisson()
 )
 
 pois_SAP(
@@ -62,7 +63,8 @@ pois_SAP(
   sparse.backend = "auto",
   nl.basis = c("legacy", "pspline"),
   orth.smooth = NULL,
-  nl.level = NULL
+  nl.level = NULL,
+  family = stats::poisson()
 )
 }
 \arguments{
@@ -72,12 +74,12 @@ pois_SAP(
 
 \item{efine}{fine-scale exposure / expected counts (length \eqn{m}; default 1)}
 
-\item{lcovfine}{optional fine-scale linear covariates (\(m \times p\))}
+\item{lcovfine}{optional fine-scale linear covariates (\eqn{m \times p})}
 
 \item{nlcovfine}{optional fine-scale covariates for univariate P-spline
-smooths (\(m \times K\))}
+smooths (\eqn{m \times K})}
 
-\item{C}{composition matrix (\(n \times m\))}
+\item{C}{composition matrix (\eqn{n \times m})}
 
 \item{x1lim, x2lim}{optional coordinate limits}
 
@@ -122,10 +124,17 @@ for columns of \code{nlcovfine} (recycled if length 1). \code{NULL} treats
 all nonlinear columns as fine (Case A). Use \code{"coarse"} for Case B and
 \code{c("fine","coarse")} for Case C so aggregated \eqn{h(z_a)} does not
 enter the spatial identifiability projection.}
+
+\item{family}{\code{stats::poisson()} (default) or \code{stats::quasipoisson()}.
+Quasi-Poisson keeps the same PIRLS+SOP point estimates as Poisson; a
+Pearson dispersion \eqn{\hat\phi} is estimated at convergence and all
+standard errors (including effect SEs) are multiplied by
+\eqn{\sqrt{\hat\phi}}. Negative binomial is not supported.}
 }
 \value{
 A \code{"clgam"} object with fine-scale \code{eta}, fitted means,
-  variance components, and optional SEs / AIC.
+  variance components, and optional SEs / AIC. Quasi-Poisson fits also
+  store \code{phi} and \code{deviance_df}.
 }
 \description{
 Prefer \code{\link{clgam}} in new code. Fits a composite-link Poisson GAMM
@@ -133,6 +142,16 @@ with anisotropic spatial P-splines and optional fine-scale smooth covariates,
 estimating variance components by separation of overlapping precision
 matrices (SOP). \code{pois_SAP} is retained as a compatibility alias.
 }
+\details{
+Inner SOP inverts the Schur complement \eqn{S} with a dense
+  \code{solve} (Rcpp when compiled). Set
+  \code{options(clgam.sop.backend = "kron_hybrid")} to use an exact
+  B3-vs-rest block inverse of the same \eqn{S} (same estimator; see
+  \code{.sop_Sinv_kron}). The default \code{"dense"} is unchanged.
+  Contrast / stacked spatial models (\code{\link{pois_incat_SOP}}) ignore
+  this option.
+}
 \seealso{
-\code{\link{clgam}}, \code{\link{pois_incat_SOP}}
+\code{\link{clgam}}, \code{\link{pois_incat_SOP}},
+  \code{\link{kappa_diagnostic}}
 }

@@ -13,10 +13,13 @@
 #' @param ndx,bdeg,pord spatial P-spline settings
 #' @param thr,maxit,parold,bold,trace,elements,decom,sparse.backend
 #'   as in \code{\link{pois_SOP}}
+#' @param family \code{poisson()} or \code{quasipoisson()} (see
+#'   \code{\link{pois_SOP}})
 #' @return A \code{"clgam"} object with group surfaces and optional difference SEs.
 #' @export
 #' @seealso \code{\link{clgam_contrast}}, \code{\link{pois_SOP}}
-pois_incat_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, cat, Ccat1, Ccat2, x1lim = NULL, x2lim = NULL, ndx = c(15, 15), bdeg = c(3, 3), pord = c(2, 2), thr = c(1e-06, 1e-06), maxit = c(100, 100), parold = c(1, 1, 1, 1), bold = NULL, trace = FALSE, elements = FALSE, decom = 1, sparse.backend = "auto") {
+pois_incat_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, cat, Ccat1, Ccat2, x1lim = NULL, x2lim = NULL, ndx = c(15, 15), bdeg = c(3, 3), pord = c(2, 2), thr = c(1e-06, 1e-06), maxit = c(100, 100), parold = c(1, 1, 1, 1), bold = NULL, trace = FALSE, elements = FALSE, decom = 1, sparse.backend = "auto", family = stats::poisson()) {
+  fam <- .resolve_clgam_family(family)
   start.all <- proc.time()[3]
   dimfine <- length(x1)
   # The difference-surface machinery below (`elements=TRUE`: sd.dif,
@@ -40,7 +43,7 @@ pois_incat_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, cat, Ccat1,
   if (is.null(x2lim)) x2lim <- .clgam_xlim(x2)
   efine <- .clgam_exposure(efine, dimfine)
 
-  # Build extended composition matrix (keep sparse — do not densify)
+  # Build extended composition matrix (keep sparse -- do not densify)
   C <- .as_comp_C(Matrix::bdiag(Ccat1, Ccat2), backend = sparse.backend)
   C_groups <- if (.is_partition_C(C)) .partition_groups(C) else NULL
 
@@ -111,6 +114,8 @@ pois_incat_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, cat, Ccat1,
 
   # Optimization procedure
   diverged <- FALSE
+  pirls_elements <- NULL
+  tol <- NA_real_
   for (i in 1:(maxit[1])) {
     # Set the clock for SOP
     start.SOP <- proc.time()[3]
@@ -210,6 +215,12 @@ pois_incat_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, cat, Ccat1,
     tol <- sum((eta - eta.old)^2)/sum(eta^2)
 
     if (trace) {cat("Convergence criterion: ", tol, "\n")}
+    if (isTRUE(elements) && (tol < thr[1] || i == maxit[1])) {
+      ginvsp_pe <- .ginvsp_from_la_incat(la, g2u, g1u, g2b, g1b)
+      pirls_elements <- .pirls_bayes_blocks(
+        C, gamma, eta, mu, y, X, Z, ginvsp_pe, groups = C_groups
+      )
+    }
     if (tol < (thr[1])) break
   }
 
@@ -220,12 +231,17 @@ pois_incat_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, cat, Ccat1,
 
   # Obtain inverse of G (see pois_SOP.R: sparse Diagonal avoids an
   # unnecessary dense q x q allocation for a structurally diagonal quantity)
-  ginvsp <- c((1/la[2])*g2u, (1/la[1])*g1u, (1/la[2])*g2b + (1/la[1])*g1b, (1/la[4])*g2u, (1/la[3])*g1u, (1/la[4])*g2b + (1/la[3])*g1b)
+  ginvsp <- .ginvsp_from_la_incat(la, g2u, g1u, g2b, g1b)
   Ginv <- Matrix::Diagonal(x = ginvsp)
 
   end.all <- proc.time()[3]
   comp.time <- end.all - start.all
   .clgam_report(trace, i, la, tol, comp.time)
+
+  edf <- c(ed1, ed2, ed3, ed4)
+  vc_names <- c("spatial.g1.x1", "spatial.g1.x2", "spatial.g2.x1", "spatial.g2.x2")
+  if (length(la) == length(vc_names)) names(la) <- vc_names
+  names(edf) <- vc_names[seq_along(edf)]
 
   out <- list(
     ndx = ndx, bdeg = bdeg, pord = pord,
@@ -233,9 +249,11 @@ pois_incat_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, cat, Ccat1,
     y = y, x1 = x1, x2 = x2, efine = efine,
     lcovfine = lcovfine, cat = cat,
     eta = eta, gamma = gamma, mu = mu,
-    var.comp = la, edf = c(ed1, ed2, ed3, ed4),
+    var.comp = la, edf = edf,
     niter = i, elapsed.time = comp.time,
     diverged = diverged,
+    tol = tol, maxit = maxit, thr = thr,
+    converged = isTRUE(!diverged && is.finite(tol) && tol < thr[1]),
     dev = c(dev.cat1, dev.cat2),
     b.fixed = b.fixed, b.random = b.random,
     matlist = list(
@@ -245,12 +263,14 @@ pois_incat_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, cat, Ccat1,
   )
 
   if (isTRUE(elements)) {
-    z <- .clmm_working_z(C, gamma, eta, mu, y, groups = C_groups)
-    opt.mat <- clmm_mat(C, gamma, X, Z, z, mu, groups = C_groups)
-    ZtZpen <- opt.mat$ZtZ
-    diag(ZtZpen) <- diag(ZtZpen) + ginvsp
-    M1 <- inv_bblock2(opt.mat$XtX, opt.mat$XtZ, opt.mat$ZtX, ZtZpen)
-    M2 <- bblock2(opt.mat$XtX, opt.mat$XtZ, opt.mat$ZtX, opt.mat$ZtZ)
+    if (is.null(pirls_elements)) {
+      pirls_elements <- .pirls_bayes_blocks(
+        C, gamma, eta, mu, y, X, Z, ginvsp, groups = C_groups
+      )
+    }
+    opt.mat <- pirls_elements$mat
+    M1 <- pirls_elements$M1
+    M2 <- pirls_elements$M2
     ed <- trprod(M1$S, M2)
     # Per-category AIC/BIC (aic1, aic2) each add the FULL shared `ed`, because
     # both categories are fitted jointly with one mixed-model system and one
@@ -285,7 +305,18 @@ pois_incat_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, cat, Ccat1,
     out$sd.dif2 <- sd.dif2
   }
 
-  .as_clgam(out, call = match.call(), family = "contrast")
+  ed_fallback <- np[1] + sum(out$edf)
+  ed_for_phi <- if (!is.null(out[["ed"]])) out[["ed"]] else ed_fallback
+  phi <- .pearson_phi(y, mu, ed_for_phi)
+  out$phi <- phi
+  if (fam$quasi) {
+    out <- .scale_se_phi(out, phi)
+  }
+  df_res <- max(length(y) - as.numeric(ed_for_phi)[1L], 1)
+  out$df.residual <- df_res
+  out$deviance_df <- sum(out$dev) / df_res
+
+  .as_clgam(out, call = match.call(), type = "contrast", family = fam$name)
 }
 
 #' @rdname pois_incat_SOP

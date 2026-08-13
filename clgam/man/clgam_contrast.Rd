@@ -15,15 +15,16 @@ clgam_contrast(
   coords = NULL,
   knots = c(15L, 15L),
   elements = TRUE,
+  family = stats::poisson(),
   ...
 )
 }
 \arguments{
-\item{y}{coarse counts}
+\item{y}{stacked coarse counts for both groups}
 
-\item{x1, x2}{fine-scale spatial coordinates (or pass \code{coords})}
+\item{x1, x2}{stacked fine-scale spatial coordinates (or pass \code{coords})}
 
-\item{exposure}{fine-scale offset / expected counts}
+\item{exposure}{stacked fine-scale offset / expected counts}
 
 \item{group}{unused placeholder}
 
@@ -34,6 +35,11 @@ clgam_contrast(
 \item{knots}{spatial knot counts (\code{ndx})}
 
 \item{elements}{compute AIC/BIC/SEs (default \code{TRUE})}
+
+\item{family}{\code{stats::poisson()} (default) or
+\code{stats::quasipoisson()}. Under quasi-Poisson, point estimates match
+Poisson; Pearson \eqn{\hat\phi} is stored in \code{fit$phi} and SEs are
+scaled by \eqn{\sqrt{\hat\phi}}.}
 
 \item{...}{further arguments to \code{pois_SOP} (e.g. \code{nl.basis="legacy"}
 for archival SMiMR behaviour)}

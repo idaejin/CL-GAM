@@ -2,11 +2,11 @@
 % Please edit documentation in R/sparse_backend.R
 \name{.comp_mul}
 \alias{.comp_mul}
-\title{C %*% (gamma * A) with Matrix, spam, or partition rowsum}
+\title{C \%*\% (gamma * A) with Matrix, spam, or partition rowsum}
 \usage{
 .comp_mul(C, gamma, A, groups = NULL)
 }
 \description{
-C %*% (gamma * A) with Matrix, spam, or partition rowsum
+Sparse or partition-aware product used in PIRLS.
 }
 \keyword{internal}

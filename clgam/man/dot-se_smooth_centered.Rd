@@ -8,6 +8,6 @@
 }
 \description{
 For design columns \code{Cg} and coefficient covariance \code{Sg}, returns
-\(\mathrm{se}_i=\sqrt{\mathrm{Var}(g_i-\bar g)}\), matching centred plots of \(g\).
+\eqn{\mathrm{se}_i=\sqrt{\mathrm{Var}(g_i-\bar g)}}, matching centred plots of \eqn{g}.
 }
 \keyword{internal}

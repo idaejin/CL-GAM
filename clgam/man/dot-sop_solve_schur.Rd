@@ -4,9 +4,26 @@
 \alias{.sop_solve_schur}
 \title{Prefer Rcpp SOP kernels when compiled; fall back to pure R.}
 \usage{
-.sop_solve_schur(XtX, ZtX, ZtZ, ZtXtZ, u, G, cache = NULL)
+.sop_solve_schur(XtX, ZtX, ZtZ, ZtXtZ, u, G, cache = NULL, meta = NULL)
+}
+\arguments{
+\item{meta}{optional \code{.sop_kron_meta()} list; used only when the
+backend is \code{"kron_hybrid"}.}
 }
 \description{
-Prefer Rcpp SOP kernels when compiled; fall back to pure R.
+Both this and \code{.sop_solve_schur_R} cache, in addition to
+\code{A11inv = solve(XtX)}, the G-FREE quantities
+\code{N = ZtZ - ZtX \%*\% A11inv \%*\% t(ZtX)} and
+\code{rhs2 = u2 - ZtX \%*\% A11inv \%*\% u1}: within one outer PIRLS
+iteration only \code{G} (from the variance components) changes across
+inner SOP iterations, and \code{S = A22 - A21 A11inv A12} algebraically
+equals \code{N \%*\% diag(G) + I} (verified numerically), so \code{N} and
+\code{rhs2} need computing only once per outer iteration rather than
+being rebuilt (at O(q^2 p) each) on every inner iteration.
+}
+\details{
+Set \code{options(clgam.sop.backend = "kron_hybrid")} to invert \code{S}
+by an exact B3-vs-rest block factorization (same estimator). Default
+\code{"dense"} keeps the compiled or dense-\code{solve} path.
 }
 \keyword{internal}

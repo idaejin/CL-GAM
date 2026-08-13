@@ -1,11 +1,10 @@
-#' logdetsym function
+#' Log-determinant of a symmetric matrix
 #'
-#' @param TODO
+#' Numerically preferable to \code{log(det(m))}.
 #'
-#' @return TODO
+#' @param m a symmetric numeric matrix
+#' @return a scalar, the log of the determinant
 #' @keywords internal
 logdetsym <- function(m){
-  # It computes the log of the det of a symmetric matrix
-  # Note: Numerical superior to log(det(m))
-  erg <- sum(log(eigen(m, symmetric = TRUE, only.values = TRUE)$values))
+  sum(log(eigen(m, symmetric = TRUE, only.values = TRUE)$values))
 }

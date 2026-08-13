@@ -2,11 +2,11 @@
 % Please edit documentation in R/utils.R
 \name{.orth_cross_max}
 \alias{.orth_cross_max}
-\title{Max absolute cross-product ||Q' A||_max after residualizing A ⊥ span(B).}
+\title{Max absolute cross-product ||Q' A||_max after residualizing A perp span(B).}
 \usage{
 .orth_cross_max(A, B)
 }
 \description{
-Max absolute cross-product ||Q' A||_max after residualizing A ⊥ span(B).
+Max absolute cross-product ||Q' A||_max after residualizing A perp span(B).
 }
 \keyword{internal}

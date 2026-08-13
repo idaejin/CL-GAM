@@ -2,11 +2,11 @@
 % Please edit documentation in R/sparse_backend.R
 \name{.is_partition_C}
 \alias{.is_partition_C}
-\title{Detect 0-1 partition composition (each fine cell → one coarse)}
+\title{Detect 0-1 partition composition (each fine cell -> one coarse)}
 \usage{
 .is_partition_C(C)
 }
 \description{
-Detect 0-1 partition composition (each fine cell → one coarse)
+Detect 0-1 partition composition (each fine cell -> one coarse)
 }
 \keyword{internal}

@@ -7,6 +7,8 @@ NULL
 
 #' @rdname clgam-methods
 #' @param object a \code{clgam} fit
+#' @param which for \code{coef}: \code{"all"} (default), \code{"fixed"}, or
+#'   \code{"random"}
 #' @param ... unused
 #' @export
 #' @method coef clgam
@@ -422,7 +424,9 @@ plot.clgam <- function(x,
 
 #' @keywords internal
 .clgam_plot_contrast <- function(x, dots, sf_fine = NULL) {
-  if (!inherits(x, "clgam_contrast") && !identical(x$family, "contrast")) {
+  if (!inherits(x, "clgam_contrast") &&
+      !identical(x$type, "contrast") &&
+      !identical(x$family, "contrast")) {
     message("Contrast plot only for two-group fits (clgam_contrast).")
     return(invisible(NULL))
   }

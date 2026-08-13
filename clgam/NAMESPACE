@@ -5,6 +5,8 @@ S3method(BIC,clgam)
 S3method(coef,clgam)
 S3method(deviance,clgam)
 S3method(fitted,clgam)
+S3method(kappa_diagnostic,clgam)
+S3method(kappa_diagnostic,default)
 S3method(logLik,clgam)
 S3method(nobs,clgam)
 S3method(plot,clgam)
@@ -18,6 +20,7 @@ export(bbasis)
 export(clgam)
 export(clgam_contrast)
 export(clmm_mat)
+export(kappa_diagnostic)
 export(mm_basis)
 export(pois_PCLM_latent)
 export(pois_SAP)
@@ -25,38 +28,48 @@ export(pois_SOP)
 export(pois_incat_SAP)
 export(pois_incat_SOP)
 export(rten2)
+export(s)
 export(simulate_ata)
+export(simulate_ata_scenarios)
 export(sparse_P2D)
 import(Matrix)
 importFrom(MASS,ginv)
 importFrom(Rcpp,evalCpp)
-importFrom(grDevices,adjustcolor)
-importFrom(grDevices,dev.interactive)
-importFrom(grDevices,devAskNewPage)
-importFrom(grDevices,hcl.colors)
-importFrom(graphics,abline)
-importFrom(graphics,legend)
-importFrom(graphics,lines)
-importFrom(graphics,mtext)
-importFrom(graphics,par)
-importFrom(graphics,plot)
-importFrom(graphics,points)
-importFrom(graphics,polygon)
-importFrom(graphics,rect)
-importFrom(graphics,text)
-importFrom(stats,AIC)
-importFrom(stats,BIC)
-importFrom(stats,coef)
-importFrom(stats,cor)
-importFrom(stats,deviance)
-importFrom(stats,dpois)
-importFrom(stats,fitted)
-importFrom(stats,logLik)
-importFrom(stats,median)
-importFrom(stats,nobs)
-importFrom(stats,predict)
-importFrom(stats,residuals)
-importFrom(stats,rpois)
-importFrom(stats,runif)
-importFrom(stats,sd)
+importFrom(grDevices,
+  adjustcolor,
+  dev.interactive,
+  devAskNewPage,
+  hcl.colors
+)
+importFrom(graphics,
+  abline,
+  legend,
+  lines,
+  mtext,
+  par,
+  plot,
+  points,
+  polygon,
+  rect,
+  text
+)
+importFrom(methods,as)
+importFrom(stats,
+  AIC,
+  BIC,
+  coef,
+  cor,
+  deviance,
+  dpois,
+  fitted,
+  logLik,
+  median,
+  model.matrix,
+  nobs,
+  predict,
+  residuals,
+  rpois,
+  runif,
+  sd
+)
 useDynLib(clgam, .registration = TRUE)

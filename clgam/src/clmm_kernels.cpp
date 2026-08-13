@@ -8,18 +8,18 @@ using namespace arma;
 //' Schur SOP solve + ED diagonal (Ayma nonsymmetric system)
 //'
 //' Algebraic note (verified numerically, see clgam SOP review notes): with
-//' A12 = XtZ %*% diag(G), A22 = ZtZ %*% diag(G) + I (both G-dependent), and
+//' A12 = XtZ \%*\% diag(G), A22 = ZtZ \%*\% diag(G) + I (both G-dependent), and
 //' A11inv fixed,
-//'   S = A22 - ZtX %*% A11inv %*% A12 = N %*% diag(G) + I,
-//'   rhs2 = u2 - ZtX %*% A11inv %*% u1,
-//' where N = ZtZ - ZtX %*% A11inv %*% XtZ and rhs2 do NOT depend on G at
+//'   S = A22 - ZtX \%*\% A11inv \%*\% A12 = N \%*\% diag(G) + I,
+//'   rhs2 = u2 - ZtX \%*\% A11inv \%*\% u1,
+//' where N = ZtZ - ZtX \%*\% A11inv \%*\% XtZ and rhs2 do NOT depend on G at
 //' all. Within one outer PIRLS iteration only G changes across inner SOP
 //' iterations (XtX, ZtX, ZtZ, u come from the working system formed once
 //' before the inner loop), so N and rhs2 are computed once (when the cache
 //' is empty) and reused: forming S per inner iteration drops from two
 //' O(q^2 p) matrix products to one O(q^2) column rescale.
 //'
-//' Also note S = N %*% diag(G) + I is NOT symmetric in general (only if G
+//' Also note S = N \%*\% diag(G) + I is NOT symmetric in general (only if G
 //' is constant), even though N itself is symmetric -- confirmed
 //' numerically (||S - t(S)|| was large, not zero, on random test inputs).
 //' The previous version solved it via `solve_opts::likely_sympd`, which
@@ -112,7 +112,9 @@ List sop_solve_schur_cpp(const arma::mat& XtX,
   );
 }
 
-//' Partition (rowsum) aggregation: C %*% (gamma * A) for 0-1 C
+//' Partition (rowsum) aggregation: C \%*\% (gamma * A) for 0-1 C
+//'
+//' Compiled helper for 0-1 composition matrices.
 //' @param gamma length n_fine
 //' @param A n_fine x p
 //' @param groups 1-based group id length n_fine

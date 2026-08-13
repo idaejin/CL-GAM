@@ -2,11 +2,11 @@
 % Please edit documentation in R/clmm_mat.R
 \name{.quad_diag}
 \alias{.quad_diag}
-\title{Diagonal of A %*% S %*% t(A) without forming the full Gram matrix}
+\title{Diagonal of A \%*\% S \%*\% t(A) without forming the full Gram matrix}
 \usage{
 .quad_diag(A, S)
 }
 \description{
-Diagonal of A %*% S %*% t(A) without forming the full Gram matrix
+Row-wise quadratic forms used for pointwise SEs.
 }
 \keyword{internal}

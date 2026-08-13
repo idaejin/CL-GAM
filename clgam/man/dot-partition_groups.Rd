@@ -2,11 +2,11 @@
 % Please edit documentation in R/sparse_backend.R
 \name{.partition_groups}
 \alias{.partition_groups}
-\title{Fine→coarse group id for partition C (length = ncol(C))}
+\title{Fine->coarse group id for partition C (length = ncol(C))}
 \usage{
 .partition_groups(C)
 }
 \description{
-Fine→coarse group id for partition C (length = ncol(C))
+Fine->coarse group id for partition C (length = ncol(C))
 }
 \keyword{internal}

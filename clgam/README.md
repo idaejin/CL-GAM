@@ -1,13 +1,14 @@
 # `clgam` R package
 
-**Version 0.1.9.** Composite link **generalized additive (mixed) models** for areal counts:
-disaggregate coarse Poisson observations to a nested fine support via a composition
+**Version 0.1.23.** Composite link **generalized additive (mixed) models** for areal counts:
+disaggregate coarse Poisson (or quasi-Poisson) observations to a nested fine support via a composition
 matrix \(C\), with anisotropic spatial P-splines and optional fine-scale smooth
 covariates. Estimation uses PIRLS + separation of overlapping precision matrices (SOP).
 
 This package is a clean public rewrite of the experimental `spclmm` fork used in
 the CL-GAM / Ayma line of work. **No MEDEA or other proprietary health data are
 included.** Examples and tests use [`simulate_ata()`](R/simulate_ata.R).
+Call `simulate_ata_scenarios()` for every named DGP and the recommended formula.
 
 ## Install
 
@@ -22,21 +23,44 @@ install.packages(".", repos = NULL, type = "source")
 ```r
 library(clgam)
 
-dat <- simulate_ata(
-  n_coarse = 16, n_fine_per = 8, seed = 1,
-  include_covariate = TRUE
-)
+simulate_ata_scenarios()[, c("scenario", "formula", "orth.smooth")]
+
+dat <- simulate_ata(scenario = "A", n_coarse = 16, n_fine_per = 8, seed = 1)
 # dat$sf_coarse / dat$sf_fine are nested Voronoi polygons (requires sf)
 
+# Formula interface (y is coarse; s() covariates are fine)
 fit <- clgam(
+  y ~ s(x1, x2) + s(z_f),
+  data = dat,
+  knots = c(10, 10),
+  knots_nl = 12,
+  orth.smooth = FALSE   # paper recovery of Cases A--C
+)
+
+# Same model with C and exposure named:
+# clgam(y ~ s(x1, x2) + s(z), C = C, exposure = ef, orth.smooth = TRUE)
+
+# Positional API (still supported)
+fit_pos <- clgam(
   y = dat$y,
-  coords = cbind(dat$x1, dat$x2),  # fine centroids
+  coords = cbind(dat$x1, dat$x2),
   C = dat$C,
   exposure = dat$efine,
   smooth = dat$nlcovfine,
   knots = c(10, 10),
-  knots_nl = 12
+  knots_nl = 12,
+  orth.smooth = FALSE
 )
+# Overdispersion: same fitted surface, SEs scaled by sqrt(phi)
+fit_qp <- clgam(
+  y = dat$y,
+  coords = cbind(dat$x1, dat$x2),
+  C = dat$C,
+  exposure = dat$efine,
+  smooth = dat$nlcovfine,
+  family = quasipoisson()
+)
+fit_qp$phi
 
 plot(fit, which = 1, sf_fine = dat$sf_fine, sf_coarse = dat$sf_coarse)
 plot(fit, which = 4, g_true = dat$g_true)

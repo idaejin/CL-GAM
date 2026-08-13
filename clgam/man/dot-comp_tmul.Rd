@@ -2,11 +2,11 @@
 % Please edit documentation in R/pois_PCLM_latent.R
 \name{.comp_tmul}
 \alias{.comp_tmul}
-\title{C' %*% v (partition-aware): fine gets coarse value of its cell}
+\title{C' \%*\% v (partition-aware): fine gets coarse value of its cell}
 \usage{
 .comp_tmul(C, v, groups = NULL)
 }
 \description{
-C' %*% v (partition-aware): fine gets coarse value of its cell
+Expands a coarse vector onto the nested fine support.
 }
 \keyword{internal}

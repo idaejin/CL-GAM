@@ -8,7 +8,8 @@
 #' @importFrom Rcpp evalCpp
 #' @importFrom MASS ginv
 #' @importFrom stats AIC BIC coef cor deviance dpois fitted logLik nobs
-#'   predict residuals runif rpois sd median
+#'   predict residuals runif rpois sd median model.matrix
+#' @importFrom methods as
 #' @importFrom graphics plot points abline lines par rect text mtext polygon
 #'   legend
 #' @importFrom grDevices hcl.colors adjustcolor dev.interactive devAskNewPage

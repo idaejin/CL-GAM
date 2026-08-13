@@ -2,17 +2,17 @@
 % Please edit documentation in R/logdetsym.R
 \name{logdetsym}
 \alias{logdetsym}
-\title{logdetsym function}
+\title{Log-determinant of a symmetric matrix}
 \usage{
 logdetsym(m)
 }
 \arguments{
-\item{TODO}{}
+\item{m}{a symmetric numeric matrix}
 }
 \value{
-TODO
+a scalar, the log of the determinant
 }
 \description{
-logdetsym function
+Numerically preferable to \code{log(det(m))}.
 }
 \keyword{internal}

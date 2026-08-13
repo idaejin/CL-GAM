@@ -26,7 +26,8 @@ pois_incat_SOP(
   trace = FALSE,
   elements = FALSE,
   decom = 1,
-  sparse.backend = "auto"
+  sparse.backend = "auto",
+  family = stats::poisson()
 )
 
 pois_incat_SAP(
@@ -50,7 +51,8 @@ pois_incat_SAP(
   trace = FALSE,
   elements = FALSE,
   decom = 1,
-  sparse.backend = "auto"
+  sparse.backend = "auto",
+  family = stats::poisson()
 )
 }
 \arguments{
@@ -71,6 +73,9 @@ pois_incat_SAP(
 \item{ndx, bdeg, pord}{spatial P-spline settings}
 
 \item{thr, maxit, parold, bold, trace, elements, decom, sparse.backend}{as in \code{\link{pois_SOP}}}
+
+\item{family}{\code{poisson()} or \code{quasipoisson()} (see
+\code{\link{pois_SOP}})}
 }
 \value{
 A \code{"clgam"} object with group surfaces and optional difference SEs.

@@ -78,7 +78,7 @@ as_comp_C <- function(C, backend = "auto") {
 # Keep internal alias used by pois_*
 .as_comp_C <- function(C, backend = "auto") as_comp_C(C, backend = backend)
 
-#' Detect 0-1 partition composition (each fine cell → one coarse)
+#' Detect 0-1 partition composition (each fine cell -> one coarse)
 #' @keywords internal
 .is_partition_C <- function(C) {
   if (inherits(C, "Matrix")) {
@@ -94,11 +94,11 @@ as_comp_C <- function(C, backend = "auto") {
   all(colSums(C) == 1)
 }
 
-#' Fine→coarse group id for partition C (length = ncol(C))
+#' Fine->coarse group id for partition C (length = ncol(C))
 #' @keywords internal
 .partition_groups <- function(C) {
   if (inherits(C, "dgCMatrix")) {
-    # one nonzero per column ⇒ @i is already the (0-based) row id per column
+    # one nonzero per column => @i is already the (0-based) row id per column
     if (length(C@x) != ncol(C)) {
       stop("partition C expected one nonzero per column")
     }
@@ -113,11 +113,13 @@ as_comp_C <- function(C, backend = "auto") {
   max.col(t(C), ties.method = "first")
 }
 
-#' C %*% (gamma * A) with Matrix, spam, or partition rowsum
+#' C \%*\% (gamma * A) with Matrix, spam, or partition rowsum
+#'
+#' Sparse or partition-aware product used in PIRLS.
 #' @keywords internal
 .comp_mul <- function(C, gamma, A, groups = NULL) {
   if (!is.null(groups)) {
-    # rowsum aggregates fine rows → coarse in group order 1..n_coarse
+    # rowsum aggregates fine rows -> coarse in group order 1..n_coarse
     n_coarse <- nrow(C)
     out <- rowsum(gamma * A, group = factor(groups, levels = seq_len(n_coarse)))
     return(unname(as.matrix(out)))

@@ -2,11 +2,11 @@
 % Please edit documentation in R/pois_PCLM_latent.R
 \name{.comp_agg}
 \alias{.comp_agg}
-\title{C %*% gamma (partition-aware)}
+\title{C \%*\% gamma (partition-aware)}
 \usage{
 .comp_agg(C, gamma, groups = NULL)
 }
 \description{
-C %*% gamma (partition-aware)
+Aggregates a fine-scale vector to coarse units.
 }
 \keyword{internal}

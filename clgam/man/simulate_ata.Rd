@@ -12,7 +12,21 @@ simulate_ata(
   covariate_level = c("fine", "coarse", "both"),
   spatial_amp = 0.45,
   nl_amp = 0.85,
-  nl_fun = function(z) (z - 0.5)^2
+  nl_fun = NULL,
+  scenario = NULL,
+  rho = NULL,
+  intercept = 0,
+  family = c("poisson", "none"),
+  exposure_scale = 1,
+  comp_sd = 0.45,
+  a_f = NULL,
+  a_g = NULL,
+  ndxnl = 10L,
+  bdegnl = 3L,
+  spatial_truth = c("pspline", "matern", "jump"),
+  matern_nu = 1,
+  matern_range = 0.3,
+  jump_amp = NULL
 )
 }
 \arguments{
@@ -27,33 +41,85 @@ simulate_ata(
 \item{covariate_level}{\code{"fine"} (Case A: \eqn{g(z_f)}), \code{"coarse"}
 (Case B: \eqn{h(z_a)} constant within each coarse unit), or \code{"both"}
 (Case C: fine \eqn{g} and coarse \eqn{h}). Cases B/C use fine expansion of
-\eqn{z_a} so \(\mu=\exp(\log(C\gamma)+h(z_a))\) when \eqn{h} is within-unit
+\eqn{z_a} so \eqn{\mu=\exp(\log(C\gamma)+h(z_a))} when \eqn{h} is within-unit
 constant.}
 
-\item{spatial_amp}{amplitude of the spatial field on fine centroids}
+\item{spatial_amp}{amplitude of the spatial field on fine centroids
+(Matern: marginal SD; jump: half the group-level gap unless
+\code{jump_amp} is set)}
 
 \item{nl_amp}{amplitude of nonlinear effect(s); length 1 or 2 for Case C
-as \code{c(g, h)}}
+as \code{c(g, h)}. Ignored under the confounding DGP (use \code{comp_sd}
+/ \code{a_f} / \code{a_g} instead).}
 
-\item{nl_fun}{function of \(z\in[0,1]\), or length-2 \code{list} for Case C.
-Default is a centred quadratic \eqn{(z-1/2)^2}.}
+\item{nl_fun}{covariate truth: a function of \eqn{z\in[0,1]}, a length-2
+\code{list} for Case C, or a preset name \code{"sine"}, \code{"tanh"}
+(Case C: descending then ascending), \code{"tanh_desc"},
+\code{"tanh_asc"}, \code{"quadratic"}. Default (no \code{scenario}) is
+a centred quadratic \eqn{(z-1/2)^2}.}
+
+\item{scenario}{optional manuscript preset \code{"A"}, \code{"B"},
+\code{"C"}, \code{"confounding"} (alias \code{"identifiability"}),
+\code{"matern1"}, \code{"matern2"}, or \code{"jump"}.
+Sets geometry, amplitudes and \code{nl_fun} / \code{spatial_truth}
+unless the caller overrides those arguments.}
+
+\item{rho}{spatial confounding in \eqn{[0,1]}. \code{NULL} (default) draws
+independent Uniform covariates. A value in \eqn{[0,1]} (including 0)
+uses the Case A mixing construction of the identifiability experiment.}
+
+\item{intercept}{additive intercept on \eqn{\eta} (log intensity)}
+
+\item{family}{\code{"poisson"} (default) draws \eqn{y_f\sim\mathrm{Poisson}(\gamma)};
+\code{"none"} uses the mean \eqn{y_f=\gamma} so \eqn{y=C\gamma} (no Poisson noise)}
+
+\item{exposure_scale}{multiplies area-normalized fine exposures}
+
+\item{comp_sd}{target SD for \eqn{a_f f_\perp} and \eqn{a_g g} in the confounding
+DGP (manuscript uses \eqn{0.45}). Used only when \code{a_f}/\code{a_g} are
+not supplied: they are calibrated on this geometry at \eqn{\rho=0} and then
+held fixed, matching the paper's scaling (shrinkage of \eqn{f_\perp} with
+\eqn{\rho} is geometric, not rescaled away).}
+
+\item{a_f, a_g}{optional confounding scales. If both are \code{NULL} they
+are calibrated from \code{comp_sd} as described above.}
+
+\item{ndxnl, bdegnl}{B-spline size for \eqn{A_f=\mathrm{span}\{B(z)\}} when
+computing \eqn{\kappa} and \eqn{f_\perp} (confounding DGP only)}
+
+\item{spatial_truth}{spatial DGP: \code{"pspline"} (default trigonometric
+field, in the span of a rich anisotropic P-spline), \code{"matern"}
+(Gaussian process, not a P-spline), or \code{"jump"} (discontinuous
+across a coarse-group boundary)}
+
+\item{matern_nu}{Matern smoothness \eqn{\nu} (presets 1 and 2)}
+
+\item{matern_range}{Matern scale \eqn{\varphi} in the Stein parameterization
+\eqn{\sqrt{2\nu}\,|h|/\varphi} (unit square; default \eqn{0.3})}
+
+\item{jump_amp}{difference between the two coarse-group levels. Default
+\code{2 * spatial_amp} so the groups sit at \eqn{\pm} \code{spatial_amp}.}
 }
 \value{
 A list with \code{y}, \code{y_fine}, \code{C}, \code{x1}/\code{x2},
   \code{efine}, \code{gamma}, \code{sf_coarse}/\code{sf_fine}, and truth.
+  Confounding draws also store \code{rho}, \code{kappa}, \code{f_raw},
+  \code{f_perp}, \code{a_f}, \code{a_g}. Misspecification draws store
+  \code{spatial_truth} and, for \code{"jump"}, \code{jump_group}.
 }
 \description{
 Generative story (fine \eqn{\rightarrow} coarse):
 \enumerate{
-  \item Build a \strong{smooth} latent field \(\eta(s)\) evaluated at fine
+  \item Build a \strong{smooth} latent field \eqn{\eta(s)} evaluated at fine
     centroids (piecewise constant on fine polygons): spatial surface plus
     optional nonlinear \eqn{g(z)}.
-  \item Fine intensity \(\gamma = e_f \odot \exp(\eta)\), with exposures
+  \item Fine intensity \eqn{\gamma = e_f \odot \exp(\eta)}, with exposures
     \eqn{e_f} proportional to fine area.
-  \item Simulate fine counts \(y_f \sim \mathrm{Poisson}(\gamma)\).
+  \item Simulate fine counts \eqn{y_f \sim \mathrm{Poisson}(\gamma)}
+    (or use the mean if \code{family="none"}).
   \item Aggregate the \emph{raw} coarse map \eqn{y = C y_f}.
 }
-For independent Poisson fine counts, \(y\sim\mathrm{Poisson}(C\gamma)\)
+For independent Poisson fine counts, \eqn{y\sim\mathrm{Poisson}(C\gamma)}
 marginally, matching the composite-link mean in \code{clgam()}.
 }
 \details{
@@ -61,5 +127,59 @@ Geometry: coarse Voronoi of the unit square; each coarse cell is itself
 partitioned into exactly \code{n_fine_per} fine Voronoi subpolygons
 (a nested partition; \code{C} is 0-1 with one 1 per column).
 
+Named \code{scenario} values fill manuscript Monte Carlo defaults (still
+overridable). Call \code{\link{simulate_ata_scenarios}} for the full table
+(geometry, truth, recommended \code{\link{clgam}} formula and
+\code{orth.smooth}).
+
 Requires \pkg{sf}. No MEDEA / proprietary data.
+}
+\section{Simulation scenarios}{
+
+\describe{
+  \item{default (\code{scenario = NULL})}{\eqn{n=12}, \eqn{m=96}, trigonometric
+    spatial field of amplitude \eqn{0.45}. No covariate unless
+    \code{include_covariate=TRUE} (then centred quadratic \eqn{g(z)}).
+    Fit \code{clgam(y ~ s(x1, x2), C = C, exposure = ef)}.}
+  \item{\code{"A"}}{\eqn{n=40}, \eqn{m=400}, spatial amplitude \eqn{0.8}, fine sine
+    of amplitude \eqn{1.2}. Recovery:
+    \code{clgam(y ~ s(x1, x2) + s(z_f), ..., orth.smooth = FALSE)}.}
+  \item{\code{"B"}}{Same sine on the coarse covariate \eqn{z_a} (constant
+    within coarse units). Recovery:
+    \code{clgam(y ~ s(x1, x2) + s(z_a, level = "coarse"), ...,
+    orth.smooth = FALSE)}.}
+  \item{\code{"C"}}{Spatial amplitude \eqn{0.75}, descending/ascending
+    \eqn{\tanh} pair of amplitude \eqn{1.2}. Recovery:
+    \code{clgam(y ~ s(x1, x2) + s(z_f) + s(z_a, level = "coarse"), ...,
+    orth.smooth = FALSE)}.}
+  \item{\code{"confounding"}}{Case A identifiability DGP
+    \eqn{z=\rho f_{\mathrm{std}}+\sqrt{1-\rho^2}\varepsilon},
+    \eqn{\eta=a_f f_\perp+a_g g(z)}. Default \eqn{\rho=0} (override with
+    \code{rho=}). Alias \code{"identifiability"}. Fit
+    \code{clgam(y ~ s(x1, x2) + s(z_f), C = C, exposure = ef,
+    orth.smooth = TRUE)}.}
+  \item{\code{"matern1"} / \code{"matern2"}}{Spatial truth is a Matern
+    Gaussian field (\eqn{\nu=1} or \eqn{2}, range \eqn{0.3}), not a P-spline;
+    no covariate. Alias \code{"matern"} \eqn{\rightarrow} \code{"matern1"}.
+    Fit \code{clgam(y ~ s(x1, x2), ...)}.}
+  \item{\code{"jump"}}{Piecewise-constant spatial truth with a jump
+    between two groups of coarse units (median split on coarse centroid
+    \eqn{x_1}). Fit \code{clgam(y ~ s(x1, x2), ...)}.}
+}
+}
+
+\examples{
+\donttest{
+# Manuscript Case A (n=40, m=400, sine)
+dat <- simulate_ata(scenario = "A", seed = 1)
+# Confounding at rho = 0.6
+dat_c <- simulate_ata(scenario = "confounding", rho = 0.6, seed = 1)
+# Spatial truth outside the P-spline span
+dat_m <- simulate_ata(scenario = "matern1", seed = 1)
+dat_j <- simulate_ata(scenario = "jump", seed = 1)
+}
+}
+\seealso{
+\code{\link{simulate_ata_scenarios}}, \code{\link{clgam}},
+  \code{\link{s}}
 }

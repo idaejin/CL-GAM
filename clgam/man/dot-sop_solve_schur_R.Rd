@@ -2,11 +2,11 @@
 % Please edit documentation in R/sop_solve.R
 \name{.sop_solve_schur_R}
 \alias{.sop_solve_schur_R}
-\title{Pure-R Schur SOP solve (fallback)}
+\title{Pure-R Schur SOP solve (fallback / Kronecker-Schur hybrid)}
 \usage{
-.sop_solve_schur_R(XtX, ZtX, ZtZ, ZtXtZ, u, G, cache = NULL)
+.sop_solve_schur_R(XtX, ZtX, ZtZ, ZtXtZ, u, G, cache = NULL, meta = NULL)
 }
 \description{
-Pure-R Schur SOP solve (fallback)
+Pure-R Schur SOP solve (fallback / Kronecker-Schur hybrid)
 }
 \keyword{internal}

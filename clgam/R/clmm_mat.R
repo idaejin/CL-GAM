@@ -48,7 +48,9 @@ clmm_mat <- function(C, gamma, X, Z, z, w, groups = NULL) {
   )
 }
 
-#' Diagonal of A %*% S %*% t(A) without forming the full Gram matrix
+#' Diagonal of A \%*\% S \%*\% t(A) without forming the full Gram matrix
+#'
+#' Row-wise quadratic forms used for pointwise SEs.
 #' @keywords internal
 .quad_diag <- function(A, S) {
   rowSums((A %*% S) * A)

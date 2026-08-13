@@ -1,3 +1,100 @@
+# clgam 0.1.23
+
+* Formula interface: `clgam(y ~ s(x1, x2) + s(z), C = C, exposure = ef,
+  orth.smooth = TRUE)`. `s()` is parsed by the package (not `mgcv`).
+  `data=` accepts a `simulate_ata()` list (`C` / `efine` filled in when
+  omitted). Case B/C: `s(z_a, level = "coarse")` expands a coarse
+  covariate through partition `C`.
+* `simulate_ata_scenarios()` catalogues every DGP preset (default, A, B,
+  C, confounding, matern1, matern2, jump) with recommended formula and
+  `orth.smooth`. Documented in `?simulate_ata`.
+* `R CMD check --as-cran` is clean of ERROR/WARNING (Rd math in
+  `\eqn{}`, ASCII sources, documented S3 arguments).
+
+# clgam 0.1.22
+
+* `simulate_ata()` misspecification DGPs whose spatial truth is not an
+  anisotropic P-spline: Matérn Gaussian fields (`scenario="matern1"` /
+  `"matern2"`, \(\nu=1,2\)) and a piecewise-constant jump between two
+  coarse-unit groups (`scenario="jump"`). Also `spatial_truth=`,
+  `matern_nu=`, `matern_range=`, `jump_amp=`.
+
+# clgam 0.1.21
+
+* `simulate_ata()` can reproduce the manuscript Monte Carlo with one call:
+  `scenario="A"|"B"|"C"|"confounding"`, covariate-truth presets
+  (`nl_fun="sine"|"tanh"|...` or a custom function), spatial confounding
+  `rho`, an `intercept` / `exposure_scale` for the Poisson intensity, and
+  `family="poisson"` (default) or `"none"` (mean counts, no Poisson noise).
+  Existing defaults (no `scenario`) are unchanged.
+
+# clgam 0.1.20
+
+* `summary.clgam()` is reviewer-facing: Pearson `phi` (and SE scaling
+  under quasi-Poisson), overlap `kappa` by fine-scale covariate, SOP
+  `tau^2` / ED labelled by smooth, AIC/BIC, and PIRLS convergence
+  (`niter`, last relative change in `eta`, `diverged`). Fits store
+  `tol`, `maxit`, `thr`, `converged`, and `orth.info$kappa_by`.
+  Contrast summaries print the joint AIC/BIC (not the per-group vector).
+
+# clgam 0.1.19
+
+* Export `kappa_diagnostic()`: functional-space overlap
+  \(\kappa=\|P_{A_f} f\|^2/\|f\|^2\) (identifiability diagnostic, manuscript
+  eq. 21). Fits store `orth.info$kappa` for the fitted spatial field. For the
+  paper's design overlap, pass `f` (unrestricted spatial field or known
+  \(f_{\mathrm{raw}}\)).
+
+# clgam 0.1.18
+
+* Kronecker–Schur W3: `options(clgam.sop.backend = "kron_hybrid")`
+  inverts the inner SOP Schur complement `S` by an exact B3-vs-rest
+  block factorization (same estimator as dense `solve(S)`). Default
+  remains `"dense"` (Rcpp when compiled). Contrast models
+  (`pois_incat_SOP`) do not use the hybrid path.
+
+# clgam 0.1.17
+
+* Kronecker–Schur W2: isolated B3 solver `.sop_solve_b3()` (`dense` /
+  Jacobi-`pcg` / diagnostic `diag`) and `.sop_solve_P2D_diag()` for the
+  original-tensor `sparse_P2D + W` path. Production `pois_SOP` Schur
+  solve is unchanged.
+
+# clgam 0.1.16
+
+* Internal Kronecker–Schur W1 helpers (`.sop_kron_meta()`,
+  `.sop_ginv_spatial()`, `.sop_N_blocks()`): spatial B1/B2/B3 index sets
+  matching `pois_SOP`, with tests that `N[idx_B3, idx_B3]` equals the
+  dense Gram of the interaction block. The inner Schur solve is unchanged.
+
+# clgam 0.1.15
+
+* When `elements=TRUE`, cache the PIRLS-weighted Bayesian blocks (`M1`, `M2`)
+  at the final outer PIRLS step and reuse them for AIC/BIC/SEs instead of
+  recomputing `clmm_mat` + `inv_bblock2` after convergence (`pois_SOP`,
+  `pois_incat_SOP`).
+
+# clgam 0.1.14
+
+* Fix Schur SOP dispatch: `.sop_solve_schur()` now detects
+  `sop_solve_schur_cpp` with `exists(..., mode = "function")` (same as
+  `clmm_mat()`). The previous `envir = environment(), inherits = FALSE`
+  check always failed, so the compiled Schur solver was never used despite
+  `options(clgam.use_rcpp = TRUE)`.
+
+# clgam 0.1.13
+
+* Add `family = poisson()` / `family = quasipoisson()` to `clgam()`,
+  `clgam_contrast()`, `pois_SOP()`, and `pois_incat_SOP()`.
+  Quasi-Poisson keeps Poisson PIRLS+SOP point estimates and variance
+  components; a Pearson dispersion `fit$phi` is estimated at convergence
+  and all standard errors are multiplied by `sqrt(phi)`. Fit objects now
+  store GLM `family` (`"poisson"` / `"quasipoisson"`) and model `type`
+  (`"spatial"` / `"contrast"`); legacy `family = "spatial"|"contrast"`
+  in `.as_clgam()` remains accepted.
+* `summary()` reports the Pearson dispersion and notes SE scaling under
+  quasi-Poisson.
+
 # clgam 0.1.12
 
 * Correctness and robustness from code review: AIC/BIC no longer

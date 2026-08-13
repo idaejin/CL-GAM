@@ -153,3 +153,173 @@ test_that("S3 methods still work", {
   expect_true(is.finite(AIC(fit)))
   expect_error(predict(fit, newdata = list(x = 1)), "newdata")
 })
+
+test_that("nl_fun presets sine/tanh match the paper curves", {
+  skip_if_not_installed("sf")
+  dat_sin <- simulate_ata(
+    n_coarse = 8L, n_fine_per = 4L, seed = 4L,
+    include_covariate = TRUE, nl_fun = "sine",
+    spatial_amp = 0.4, nl_amp = 1.0, family = "none"
+  )
+  z <- dat_sin$z_f
+  g <- dat_sin$g_true - mean(dat_sin$g_true)
+  gs <- sin(2 * pi * z)
+  gs <- gs - mean(gs)
+  expect_gt(cor(g, gs), 0.999)
+
+  dat_c <- simulate_ata(
+    n_coarse = 8L, n_fine_per = 4L, seed = 5L,
+    include_covariate = TRUE, covariate_level = "both",
+    nl_fun = "tanh", nl_amp = c(1.2, 1.2),
+    spatial_amp = 0.5, family = "none"
+  )
+  expect_equal(dat_c$case, "C")
+  expect_equal(dat_c$nl_level, c("fine", "coarse"))
+  gf <- dat_c$g_true - mean(dat_c$g_true)
+  gt <- -tanh(2.5 * (dat_c$z_f - 0.5))
+  gt <- gt - mean(gt)
+  expect_gt(cor(gf, gt), 0.999)
+  ht <- tanh(2.5 * (dat_c$z_a - 0.5))
+  ht <- ht - mean(ht)
+  h_coarse <- vapply(split(dat_c$h_true, dat_c$coarse_id), mean, 0)
+  expect_gt(cor(h_coarse, ht), 0.999)
+})
+
+test_that("scenario presets fill paper A/C defaults but stay overridable", {
+  skip_if_not_installed("sf")
+  dat_a <- simulate_ata(scenario = "A", n_coarse = 8L, n_fine_per = 4L,
+                        seed = 6L, family = "none")
+  expect_equal(dat_a$scenario, "A")
+  expect_equal(dat_a$case, "A")
+  expect_equal(dat_a$n_fine, 32L)
+  expect_equal(colnames(dat_a$nlcovfine), "z_f")
+  z <- dat_a$z_f
+  g <- dat_a$g_true - mean(dat_a$g_true)
+  gs <- 1.2 * sin(2 * pi * z)
+  gs <- gs - mean(gs)
+  expect_gt(cor(g, gs), 0.999)
+
+  dat_c <- simulate_ata(scenario = "C", n_coarse = 8L, n_fine_per = 4L,
+                        seed = 7L, family = "none")
+  expect_equal(dat_c$case, "C")
+  expect_equal(ncol(dat_c$nlcovfine), 2L)
+})
+
+test_that("rho confounding raises kappa and stores f_perp", {
+  skip_if_not_installed("sf")
+  d0 <- simulate_ata(
+    n_coarse = 10L, n_fine_per = 4L, seed = 11L,
+    spatial_amp = 0.8, rho = 0, family = "none"
+  )
+  d9 <- simulate_ata(
+    n_coarse = 10L, n_fine_per = 4L, seed = 11L,
+    spatial_amp = 0.8, rho = 0.9, family = "none"
+  )
+  expect_equal(d0$n_fine, d9$n_fine)
+  expect_equal(d0$x1, d9$x1)
+  expect_true(is.finite(d0$kappa))
+  expect_gt(d9$kappa, d0$kappa)
+  expect_equal(length(d9$f_perp), d9$n_fine)
+  expect_equal(
+    as.numeric(d9$eta_true),
+    as.numeric(d9$f_perp + d9$g_true),
+    tolerance = 1e-10
+  )
+  expect_lt(abs(stats::sd(d0$g_true) - 0.45), 0.15)
+})
+
+test_that("Poisson DGP intercept, exposure_scale, and family='none'", {
+  skip_if_not_installed("sf")
+  d_mean <- simulate_ata(
+    n_coarse = 8L, n_fine_per = 4L, seed = 2L, family = "none"
+  )
+  expect_equal(d_mean$family, "none")
+  expect_equal(d_mean$y, d_mean$mu_coarse, tolerance = 1e-10)
+
+  d0 <- simulate_ata(
+    n_coarse = 8L, n_fine_per = 4L, seed = 2L,
+    family = "none", intercept = 0
+  )
+  d1 <- simulate_ata(
+    n_coarse = 8L, n_fine_per = 4L, seed = 2L,
+    family = "none", intercept = 1
+  )
+  expect_equal(d1$gamma / d0$gamma, rep(exp(1), d0$n_fine), tolerance = 1e-10)
+
+  de <- simulate_ata(
+    n_coarse = 8L, n_fine_per = 4L, seed = 2L,
+    family = "none", exposure_scale = 2
+  )
+  expect_equal(de$efine / d0$efine, rep(2, d0$n_fine), tolerance = 1e-10)
+
+  d_pois <- simulate_ata(
+    n_coarse = 8L, n_fine_per = 4L, seed = 2L, family = "poisson"
+  )
+  expect_true(all(d_pois$y_fine == as.integer(d_pois$y_fine)))
+  expect_equal(d_pois$y, as.numeric(d_pois$C %*% d_pois$y_fine))
+})
+
+test_that("Matérn covariance is 1 at 0 and decreases with distance", {
+  expect_equal(clgam:::.clgam_matern_cov(0, nu = 1, range = 0.3), 1)
+  expect_equal(clgam:::.clgam_matern_cov(0, nu = 2, range = 0.3), 1)
+  h <- seq(0, 1, length.out = 25)
+  c1 <- clgam:::.clgam_matern_cov(h, nu = 1, range = 0.3)
+  c2 <- clgam:::.clgam_matern_cov(h, nu = 2, range = 0.3)
+  expect_true(all(diff(c1) <= 1e-10))
+  expect_true(all(diff(c2) <= 1e-10))
+  expect_gt(c2[3], c1[3])
+})
+
+test_that("matern1/matern2 truths are GP draws, not the P-spline field", {
+  skip_if_not_installed("sf")
+  d_ps <- simulate_ata(
+    n_coarse = 8L, n_fine_per = 4L, seed = 8L,
+    spatial_amp = 0.8, family = "none"
+  )
+  d1 <- simulate_ata(
+    scenario = "matern1", n_coarse = 8L, n_fine_per = 4L,
+    seed = 8L, family = "none"
+  )
+  d2 <- simulate_ata(
+    scenario = "matern2", n_coarse = 8L, n_fine_per = 4L,
+    seed = 8L, family = "none"
+  )
+  expect_equal(d1$spatial_truth, "matern")
+  expect_equal(d1$matern_nu, 1)
+  expect_equal(d2$matern_nu, 2)
+  expect_true(is.null(d1$nlcovfine))
+  expect_gt(
+    mean((d1$eta_spatial_true - d_ps$eta_spatial_true)^2),
+    1e-4
+  )
+  expect_gt(
+    mean((d1$eta_spatial_true - d2$eta_spatial_true)^2),
+    1e-6
+  )
+  expect_true(is.finite(stats::sd(d1$eta_spatial_true)))
+})
+
+test_that("jump truth is piecewise constant on two coarse groups", {
+  skip_if_not_installed("sf")
+  d <- simulate_ata(
+    scenario = "jump", n_coarse = 10L, n_fine_per = 4L,
+    seed = 9L, family = "none", spatial_amp = 0.8
+  )
+  expect_equal(d$spatial_truth, "jump")
+  expect_equal(d$jump_amp, 1.6)
+  expect_equal(length(unique(d$eta_spatial_true)), 2L)
+  expect_true(all(vapply(
+    split(d$eta_spatial_true, d$coarse_id),
+    function(v) length(unique(round(v, 10))) == 1L,
+    logical(1)
+  )))
+  expect_equal(
+    diff(sort(unique(d$eta_spatial_true))),
+    d$jump_amp,
+    tolerance = 1e-10
+  )
+  expect_equal(length(unique(d$jump_group)), 2L)
+  expect_true(all(d$jump_group[d$coarse_id] == d$sf_fine$jump_group))
+})
+
+

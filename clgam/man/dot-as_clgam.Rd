@@ -2,11 +2,11 @@
 % Please edit documentation in R/utils.R
 \name{.as_clgam}
 \alias{.as_clgam}
-\title{Attach S3 class and optional quiet fit banner}
+\title{Attach S3 class; \code{family} is the GLM family, \code{type} is spatial/contrast.}
 \usage{
-.as_clgam(x, call = NULL, family = c("spatial", "contrast"))
+.as_clgam(x, call = NULL, type = c("spatial", "contrast"), family = "poisson")
 }
 \description{
-Attach S3 class and optional quiet fit banner
+Attach S3 class; \code{family} is the GLM family, \code{type} is spatial/contrast.
 }
 \keyword{internal}

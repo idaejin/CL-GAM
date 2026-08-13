@@ -9,10 +9,22 @@
 #' equals \code{N \%*\% diag(G) + I} (verified numerically), so \code{N} and
 #' \code{rhs2} need computing only once per outer iteration rather than
 #' being rebuilt (at O(q^2 p) each) on every inner iteration.
+#'
+#' Set \code{options(clgam.sop.backend = "kron_hybrid")} to invert \code{S}
+#' by an exact B3-vs-rest block factorization (same estimator). Default
+#' \code{"dense"} keeps the compiled or dense-\code{solve} path.
+#' @param meta optional \code{.sop_kron_meta()} list; used only when the
+#'   backend is \code{"kron_hybrid"}.
 #' @keywords internal
-.sop_solve_schur <- function(XtX, ZtX, ZtZ, ZtXtZ, u, G, cache = NULL) {
-  if (isTRUE(getOption("clgam.use_rcpp", TRUE)) &&
-      exists("sop_solve_schur_cpp", envir = environment(), inherits = FALSE)) {
+.sop_solve_schur <- function(XtX, ZtX, ZtZ, ZtXtZ, u, G, cache = NULL,
+                             meta = NULL) {
+  backend <- getOption("clgam.sop.backend", "dense")
+  use_kron <- identical(backend, "kron_hybrid") &&
+    .sop_kron_applicable(meta, length(G))
+  # Kronecker-Schur block inverse is R-only (needs meta). Dense keeps Rcpp.
+  if (!use_kron &&
+      isTRUE(getOption("clgam.use_rcpp", TRUE)) &&
+      exists("sop_solve_schur_cpp", mode = "function")) {
     A11inv <- if (!is.null(cache$A11inv)) cache$A11inv else matrix(0, 0, 0)
     N <- if (!is.null(cache$N)) cache$N else matrix(0, 0, 0)
     rhs2 <- if (!is.null(cache$rhs2)) cache$rhs2 else numeric(0)
@@ -29,12 +41,13 @@
       ))
     }
   }
-  .sop_solve_schur_R(XtX, ZtX, ZtZ, ZtXtZ, u, G, cache)
+  .sop_solve_schur_R(XtX, ZtX, ZtZ, ZtXtZ, u, G, cache, meta = meta)
 }
 
-#' Pure-R Schur SOP solve (fallback)
+#' Pure-R Schur SOP solve (fallback / Kronecker-Schur hybrid)
 #' @keywords internal
-.sop_solve_schur_R <- function(XtX, ZtX, ZtZ, ZtXtZ, u, G, cache = NULL) {
+.sop_solve_schur_R <- function(XtX, ZtX, ZtZ, ZtXtZ, u, G, cache = NULL,
+                               meta = NULL) {
   p <- ncol(XtX)
   q <- length(G)
   u1 <- u[seq_len(p)]
@@ -54,17 +67,14 @@
   N <- cache$N
   rhs2 <- cache$rhs2
 
-  # S = N %*% diag(G) + I (column rescale of the cached, G-free N).
-  S <- sweep(N, 2L, G, `*`)
-  diag(S) <- diag(S) + 1
+  backend <- getOption("clgam.sop.backend", "dense")
+  if (identical(backend, "kron_hybrid") && .sop_kron_applicable(meta, q)) {
+    Sinv <- .sop_Sinv_kron(N, G, meta)
+  } else {
+    Sinv <- .sop_Sinv_dense(N, G)
+  }
   A12 <- sweep(XtZ, 2L, G, `*`)
 
-  # S is generally NOT symmetric (only N is); a plain solve() (LU-based)
-  # handles that correctly, unlike a Cholesky/sympd-only method.
-  Sinv <- try(solve(S), silent = TRUE)
-  if (inherits(Sinv, "try-error")) {
-    Sinv <- MASS::ginv(S)
-  }
   b2 <- as.numeric(Sinv %*% rhs2)
   b1 <- as.numeric(A11inv %*% (u1 - as.numeric(A12 %*% b2)))
 

@@ -16,6 +16,13 @@ test_that(".orth_cols and Af builders enforce fine-only space", {
   Af_lin <- clgam:::.build_orth_Af(NULL, NULL, lin)
   expect_equal(ncol(Af_lin), 1L)
   expect_null(clgam:::.build_orth_Af(Bk, c("coarse", "coarse"), NULL))
+
+  parts <- clgam:::.build_orth_Af_parts(
+    Bk, c("fine", "coarse"), lin,
+    smooth_names = c("z_f", "z_a"), linear_names = "xlin"
+  )
+  expect_equal(names(parts), c("z_f", "xlin"))
+  expect_equal(ncol(parts$z_f), 3L)
 })
 
 test_that("Case A orth.smooth yields near-zero Q'Xs and Q'Zs", {
@@ -104,4 +111,57 @@ test_that("orth.smooth=FALSE leaves spatial design unrestricted", {
   )
   expect_false(fit0$orth.smooth)
   expect_false(isTRUE(fit0$orth.info$applied))
+})
+
+test_that("kappa_diagnostic matches QR formula for eq. 21", {
+  set.seed(1)
+  A <- cbind(runif(40), runif(40))
+  f <- rnorm(40)
+  kap <- kappa_diagnostic(f, A)
+  f0 <- f - mean(f)
+  fp <- clgam:::.orth_cols(cbind(f0), A)[, 1]
+  expect_equal(kap, sum((f0 - fp)^2) / sum(f0^2), tolerance = 1e-12)
+  expect_gte(kap, 0)
+  expect_lte(kap, 1)
+})
+
+test_that("kappa is ~1 when f lies in span(A) and ~0 when orthogonal", {
+  set.seed(2)
+  A <- cbind(runif(50), runif(50))
+  f_in <- as.numeric(A %*% c(1.1, -0.4))
+  expect_gt(kappa_diagnostic(f_in, A, center = FALSE), 0.99)
+  Q <- qr.Q(qr(A))
+  f_orth <- rnorm(50)
+  f_orth <- f_orth - as.numeric(Q %*% crossprod(Q, f_orth))
+  expect_lt(kappa_diagnostic(f_orth, A, center = FALSE), 1e-10)
+})
+
+test_that("clgam method matches stored kappa and accepts f_raw (eq. 21)", {
+  skip_if_not_installed("sf")
+  dat <- simulate_ata(
+    n_coarse = 16L, n_fine_per = 5L, seed = 11L,
+    include_covariate = TRUE, nl_amp = 1.0, spatial_amp = 0.5,
+    nl_fun = function(z) sin(2 * pi * z)
+  )
+  fit <- clgam(
+    dat$y, dat$x1, dat$x2, dat$C,
+    exposure = dat$efine, smooth = dat$nlcovfine,
+    knots = c(6L, 6L), knots_nl = 8L,
+    elements = FALSE, trace = FALSE, orth.smooth = TRUE
+  )
+  expect_true(is.finite(fit$orth.info$kappa))
+  expect_gte(fit$orth.info$kappa, 0)
+  expect_lte(fit$orth.info$kappa, 1)
+  expect_equal(
+    kappa_diagnostic(fit),
+    fit$orth.info$kappa,
+    tolerance = 1e-10
+  )
+  f_raw <- as.numeric(dat$eta_spatial_true)
+  Af <- clgam:::.clgam_Af(fit)
+  expect_equal(
+    kappa_diagnostic(fit, f = f_raw),
+    kappa_diagnostic(f_raw, Af),
+    tolerance = 1e-10
+  )
 })

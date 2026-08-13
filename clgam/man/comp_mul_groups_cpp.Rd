@@ -2,7 +2,7 @@
 % Please edit documentation in R/RcppExports.R
 \name{comp_mul_groups_cpp}
 \alias{comp_mul_groups_cpp}
-\title{Partition (rowsum) aggregation: C %*% (gamma * A) for 0-1 C}
+\title{Partition (rowsum) aggregation: C \%*\% (gamma * A) for 0-1 C}
 \usage{
 comp_mul_groups_cpp(gamma, A, groups, n_coarse)
 }
@@ -16,6 +16,6 @@ comp_mul_groups_cpp(gamma, A, groups, n_coarse)
 \item{n_coarse}{number of coarse cells}
 }
 \description{
-Partition (rowsum) aggregation: C %*% (gamma * A) for 0-1 C
+Compiled helper for 0-1 composition matrices.
 }
 \keyword{internal}

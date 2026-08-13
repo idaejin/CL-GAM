@@ -31,6 +31,9 @@
 \arguments{
 \item{object}{a \code{clgam} fit}
 
+\item{which}{for \code{coef}: \code{"all"} (default), \code{"fixed"}, or
+\code{"random"}}
+
 \item{...}{unused}
 
 \item{type}{residual type: deviance, Pearson, or response (\code{y - mu})}

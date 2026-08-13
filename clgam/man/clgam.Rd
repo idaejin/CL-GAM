@@ -8,7 +8,7 @@ clgam(
   y,
   x1 = NULL,
   x2 = NULL,
-  C,
+  C = NULL,
   exposure = NULL,
   linear = NULL,
   smooth = NULL,
@@ -17,42 +17,92 @@ clgam(
   knots = c(15L, 15L),
   knots_nl = 10L,
   elements = TRUE,
+  family = stats::poisson(),
+  data = NULL,
+  orth.smooth = NULL,
   ...
 )
 }
 \arguments{
-\item{y}{coarse counts}
+\item{y}{coarse counts, or a two-sided formula such as
+\code{y ~ s(x1, x2) + s(z)}}
 
-\item{x1, x2}{fine-scale spatial coordinates (or pass \code{coords})}
+\item{x1, x2}{fine-scale spatial coordinates (or pass \code{coords}).
+Ignored when \code{y} is a formula.}
 
-\item{C}{composition matrix (coarse \(\times\) fine)}
+\item{C}{composition matrix (coarse \eqn{\times} fine). Optional when
+\code{data} is a \code{\link{simulate_ata}} list that already contains
+\code{C}.}
 
-\item{exposure}{fine-scale offset / expected counts}
+\item{exposure}{fine-scale offset / expected counts. Optional when
+\code{data} supplies \code{efine}.}
 
 \item{linear}{optional fine-scale linear covariates}
 
 \item{smooth}{optional covariates for univariate P-spline smooths
 (Case A/B/C). Matrix with one column (A or B) or two (Case C: fine then
-coarse-expanded). Default basis \code{nl.basis="pspline"}.}
+coarse-expanded). Default basis \code{nl.basis="pspline"}. Ignored when
+\code{y} is a formula (\code{s()} terms are used instead).}
 
 \item{smooth_level}{optional \code{"fine"} / \code{"coarse"} labels for
 \code{smooth} columns (passed as \code{nl.level} to \code{pois_SOP}).
-Use \code{"coarse"} for Case B and \code{c("fine","coarse")} for Case C.}
+Use \code{"coarse"} for Case B and \code{c("fine","coarse")} for Case C.
+With a formula, use \code{s(z, level = "coarse")} instead.}
 
 \item{coords}{optional \code{n_fine x 2} matrix}
 
-\item{knots}{spatial knot counts (\code{ndx})}
+\item{knots}{spatial knot counts (\code{ndx}). Overridden by
+\code{s(x1, x2, k = )} when \code{knots} is not passed.}
 
-\item{knots_nl}{knot count(s) for each smooth covariate (\code{ndxnl})}
+\item{knots_nl}{knot count(s) for each smooth covariate (\code{ndxnl}).
+Overridden by \code{s(z, k = )} when \code{knots_nl} is not passed.}
 
 \item{elements}{compute AIC/BIC/SEs (default \code{TRUE})}
+
+\item{family}{\code{stats::poisson()} (default) or
+\code{stats::quasipoisson()}. Under quasi-Poisson, point estimates match
+Poisson; Pearson \eqn{\hat\phi} is stored in \code{fit$phi} and SEs are
+scaled by \eqn{\sqrt{\hat\phi}}.}
+
+\item{data}{optional list or data frame in which to find formula variables.
+A \code{\link{simulate_ata}} result also supplies \code{C} and
+\code{exposure} (\code{efine}) when those arguments are omitted.}
+
+\item{orth.smooth}{identifiability projection; see \code{\link{pois_SOP}}.
+Default \code{NULL} follows the basis (\code{TRUE} for P-splines).
+Manuscript recovery of Cases A--C uses \code{FALSE}; the confounding
+study uses \code{TRUE}. See \code{\link{simulate_ata_scenarios}}.}
 
 \item{...}{further arguments to \code{pois_SOP} (e.g. \code{nl.basis="legacy"}
 for archival SMiMR behaviour)}
 }
 \value{
-An object of class \code{"clgam"}.
+An object of class \code{"clgam"}. Formula fits store
+  \code{fit$formula}.
 }
 \description{
-User-facing wrapper around \code{\link{pois_SOP}}.
+User-facing wrapper around \code{\link{pois_SOP}}. The first argument may
+be coarse counts (positional API) or an \pkg{mgcv}-style formula
+\code{y ~ s(x1, x2) + s(z)}. The formula is parsed by \pkg{clgam}; it is
+not evaluated by \pkg{mgcv}. Left-hand side \code{y} is \emph{coarse};
+\code{s()} covariates are on the \emph{fine} support (a length-\code{n_coarse}
+vector such as Case B \code{z_a} is expanded through partition \code{C}).
+}
+\examples{
+\donttest{
+dat <- simulate_ata(scenario = "A", n_coarse = 12, n_fine_per = 4, seed = 1)
+fit <- clgam(
+  y ~ s(x1, x2) + s(z_f),
+  data = dat,
+  knots = c(8, 8),
+  orth.smooth = FALSE
+)
+# Same call with C and exposure named (user-facing interface):
+# clgam(y ~ s(x1, x2) + s(z), C = C, exposure = ef, orth.smooth = TRUE)
+}
+}
+\seealso{
+\code{\link{s}}, \code{\link{pois_SOP}}, \code{\link{simulate_ata}},
+  \code{\link{simulate_ata_scenarios}}, \code{\link{kappa_diagnostic}},
+  \code{\link{summary.clgam}}
 }

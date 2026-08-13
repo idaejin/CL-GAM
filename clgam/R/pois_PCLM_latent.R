@@ -1,6 +1,6 @@
-#' Penalized CLM via Camarda–Durbán latent working response
+#' Penalized CLM via Camarda-Durban latent working response
 #'
-#' Implements the iterative scheme of Camarda & Durbán
+#' Implements the iterative scheme of Camarda & Durban
 #' (\url{https://arxiv.org/abs/2412.04956}): redistribute aggregated counts to a
 #' fine-scale working response
 #' \eqn{\tilde y = \gamma \odot (C^\top (y \oslash \mu))}, then update
@@ -16,16 +16,17 @@
 #' @param y coarse Poisson counts
 #' @param x1,x2 fine-scale coordinates (length = ncol(C))
 #' @param efine fine-scale offset / exposure (default 1)
-#' @param C composition matrix (coarse × fine)
+#' @param C composition matrix (coarse x fine)
+#' @param x1lim,x2lim optional coordinate limits
 #' @param ndx,bdeg,pord P-spline settings (same spirit as \code{pois_SOP})
 #' @param lambda length-2 smoothness weights for the Kronecker penalty
 #' @param thr,maxit convergence on relative change in \eqn{\eta}
 #' @param sparse.backend passed to \code{as_comp_C}
 #' @param trace print iteration info
-#' @return list with \code{eta}, \code{gamma}, \code{mu}, \code{alpha}, \code{dev}, …
+#' @return list with \code{eta}, \code{gamma}, \code{mu}, \code{alpha}, \code{dev}, ...
 #' @export
 #' @references
-#' Camarda, C. G. and Durbán, M. (2025).
+#' Camarda, C. G. and Durban, M. (2025).
 #' Fast Estimation of the Composite Link Model for Multidimensional Grouped Counts.
 #' \emph{arXiv}:2412.04956.
 pois_PCLM_latent <- function(y, x1, x2, efine = NULL, C,
@@ -64,10 +65,10 @@ pois_PCLM_latent <- function(y, x1, x2, efine = NULL, C,
 
   for (i in seq_len(maxit)) {
     y_tilde <- gamma * .comp_tmul(C, y / mu, C_groups)
-    # IWLS working vector for Poisson mean γ (Camarda–Durbán)
+    # IWLS working vector for Poisson mean gamma (Camarda-Durban)
     z <- eta + (y_tilde - gamma) / pmax(gamma, 1e-12)
     w <- gamma
-    # (B' W B + P) α = B' (W z)  with W = diag(γ)
+    # (B' W B + P) alpha = B' (W z)  with W = diag(gamma)
     if (isTRUE(getOption("clgam.use_rcpp", TRUE)) &&
         exists("btWb_cpp", mode = "function")) {
       tmp <- btWb_cpp(B, w, z)
@@ -121,7 +122,9 @@ pois_PCLM_latent <- function(y, x1, x2, efine = NULL, C,
   )
 }
 
-#' C %*% gamma (partition-aware)
+#' C \%*\% gamma (partition-aware)
+#'
+#' Aggregates a fine-scale vector to coarse units.
 #' @keywords internal
 .comp_agg <- function(C, gamma, groups = NULL) {
   if (!is.null(groups)) {
@@ -131,7 +134,9 @@ pois_PCLM_latent <- function(y, x1, x2, efine = NULL, C,
   }
 }
 
-#' C' %*% v (partition-aware): fine gets coarse value of its cell
+#' C' \%*\% v (partition-aware): fine gets coarse value of its cell
+#'
+#' Expands a coarse vector onto the nested fine support.
 #' @keywords internal
 .comp_tmul <- function(C, v, groups = NULL) {
   if (!is.null(groups)) {

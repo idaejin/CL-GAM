@@ -7,7 +7,7 @@
 \method{predict}{clgam}(
   object,
   newdata = NULL,
-  type = c("eta", "mu", "gamma", "response", "exp.eta"),
+  type = c("eta", "mu", "gamma", "response", "exp.eta", "diff", "shared"),
   se.fit = FALSE,
   ...
 )
@@ -18,7 +18,7 @@
 \item{newdata}{currently must be \code{NULL}}
 
 \item{type}{\code{"eta"}, \code{"mu"}, \code{"gamma"}, \code{"response"},
-or \code{"exp.eta"}}
+\code{"exp.eta"}, or for two-group fits \code{"diff"} / \code{"shared"}}
 
 \item{se.fit}{if \code{TRUE} and SEs were computed (\code{elements=TRUE}),
 return a list with \code{fit} and \code{se.fit}}

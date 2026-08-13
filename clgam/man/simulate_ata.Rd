@@ -23,6 +23,7 @@ simulate_ata(
   a_g = NULL,
   ndxnl = 10L,
   bdegnl = 3L,
+  identifying = c("perp", "unrestricted"),
   spatial_truth = c("pspline", "matern", "jump"),
   matern_nu = 1,
   matern_range = 0.3,
@@ -85,7 +86,14 @@ held fixed, matching the paper's scaling (shrinkage of \eqn{f_\perp} with
 are calibrated from \code{comp_sd} as described above.}
 
 \item{ndxnl, bdegnl}{B-spline size for \eqn{A_f=\mathrm{span}\{B(z)\}} when
-computing \eqn{\kappa} and \eqn{f_\perp} (confounding DGP only)}
+computing \eqn{\kappa} and \eqn{f_\perp}}
+
+\item{identifying}{\code{"perp"} (default): when a fine covariate is present
+(Case A/C), replace the spatial field by
+\eqn{f_\perp=(I-P_{B(z_{\mathrm{f}})})f_{\mathrm{raw}}} so the DGP matches
+\code{orth.smooth=TRUE}. \code{"unrestricted"} keeps \eqn{f_{\mathrm{raw}}}
+(older A--C recovery tables). Ignored for Case B and for the
+\code{rho} confounding DGP (already \eqn{f_\perp}).}
 
 \item{spatial_truth}{spatial DGP: \code{"pspline"} (default trigonometric
 field, in the span of a rich anisotropic P-spline), \code{"matern"}
@@ -103,8 +111,8 @@ across a coarse-group boundary)}
 \value{
 A list with \code{y}, \code{y_fine}, \code{C}, \code{x1}/\code{x2},
   \code{efine}, \code{gamma}, \code{sf_coarse}/\code{sf_fine}, and truth.
-  Confounding draws also store \code{rho}, \code{kappa}, \code{f_raw},
-  \code{f_perp}, \code{a_f}, \code{a_g}. Misspecification draws store
+  Confounding and identified Case A/C draws also store \code{kappa},
+  \code{f_raw}, \code{f_perp}. Misspecification draws store
   \code{spatial_truth} and, for \code{"jump"}, \code{jump_group}.
 }
 \description{
@@ -142,16 +150,18 @@ Requires \pkg{sf}. No MEDEA / proprietary data.
     \code{include_covariate=TRUE} (then centred quadratic \eqn{g(z)}).
     Fit \code{clgam(y ~ s(x1, x2), C = C, exposure = ef)}.}
   \item{\code{"A"}}{\eqn{n=40}, \eqn{m=400}, spatial amplitude \eqn{0.8}, fine sine
-    of amplitude \eqn{1.2}. Recovery:
-    \code{clgam(y ~ s(x1, x2) + s(z_f), ..., orth.smooth = FALSE)}.}
+    of amplitude \eqn{1.2}. Spatial truth is \eqn{f_\perp} against
+    \eqn{B(z_{\mathrm{f}})}. Fit
+    \code{clgam(y ~ s(x1, x2) + s(z_f), ..., orth.smooth = TRUE)}.}
   \item{\code{"B"}}{Same sine on the coarse covariate \eqn{z_a} (constant
-    within coarse units). Recovery:
-    \code{clgam(y ~ s(x1, x2) + s(z_a, level = "coarse"), ...,
-    orth.smooth = FALSE)}.}
+    within coarse units). Spatial truth remains unrestricted \eqn{f}.
+    Fit \code{clgam(y ~ s(x1, x2) + s(z_a, level = "coarse"), ...,
+    orth.smooth = TRUE)} (restriction is a no-op).}
   \item{\code{"C"}}{Spatial amplitude \eqn{0.75}, descending/ascending
-    \eqn{\tanh} pair of amplitude \eqn{1.2}. Recovery:
+    \eqn{\tanh} pair of amplitude \eqn{1.2}. Spatial truth is \eqn{f_\perp}
+    against the fine \eqn{B(z_{\mathrm{f}})} only. Fit
     \code{clgam(y ~ s(x1, x2) + s(z_f) + s(z_a, level = "coarse"), ...,
-    orth.smooth = FALSE)}.}
+    orth.smooth = TRUE)}.}
   \item{\code{"confounding"}}{Case A identifiability DGP
     \eqn{z=\rho f_{\mathrm{std}}+\sqrt{1-\rho^2}\varepsilon},
     \eqn{\eta=a_f f_\perp+a_g g(z)}. Default \eqn{\rho=0} (override with

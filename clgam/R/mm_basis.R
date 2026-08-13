@@ -1,10 +1,14 @@
 #' Construct elements of the mixed model representation
 #'
 #' @inheritParams bbasis
-#' @param pord TODO
-#' @param decom TODO
+#' @param pord penalty order (number of differences in \code{D})
+#' @param decom fixed-effect construction: \code{1} uses the penalty
+#'   null space (\code{B \%*\% Un}); \code{2} uses the polynomial
+#'   \code{1, x, ..., x^(pord-1)}
 #'
-#' @return TODO
+#' @return A list with fixed \code{X}, random \code{Z}, penalty
+#'   eigenvalues \code{d}, basis \code{B}, dimension \code{m},
+#'   difference matrix \code{D}, eigenvectors \code{U}, and \code{knots}.
 #' @seealso \code{\link{bbasis}}
 #' @export
 

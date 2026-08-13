@@ -34,6 +34,55 @@ test_that("AIC.clgam/BIC.clgam do not double-count ed for clgam_contrast fits", 
   expect_false(isTRUE(all.equal(AIC(fit), sum(fit$aic))))
 })
 
+test_that("structure='contrast' uses shared+difference (sum-to-zero)", {
+  skip_if_not_installed("sf")
+  dat <- simulate_ata(n_coarse = 10L, n_fine_per = 4L, seed = 8L, spatial_amp = 0.5)
+  set.seed(102)
+  y1 <- as.numeric(dat$C %*% rpois(dat$n_fine, dat$gamma))
+  y2 <- as.numeric(dat$C %*% rpois(dat$n_fine, dat$gamma * 1.2))
+  fit <- clgam_contrast(
+    y = c(y1, y2),
+    x1 = c(dat$x1, dat$x1), x2 = c(dat$x2, dat$x2),
+    exposure = c(dat$efine, dat$efine),
+    C1 = dat$C, C2 = dat$C,
+    knots = c(5L, 5L), elements = TRUE,
+    structure = "contrast"
+  )
+  expect_identical(fit$structure, "contrast")
+  expect_equal(
+    names(fit$var.comp),
+    c("spatial.shared.x1", "spatial.shared.x2",
+      "spatial.contrast.x1", "spatial.contrast.x2")
+  )
+  n2 <- length(dat$x1)
+  expect_equal(fit$eta.diff, fit$eta[seq_len(n2)] - fit$eta[(n2 + 1):length(fit$eta)])
+  expect_equal(
+    fit$eta.shared,
+    0.5 * (fit$eta[seq_len(n2)] + fit$eta[(n2 + 1):length(fit$eta)])
+  )
+  # Sum-to-zero on the stacked spatial deviation: mean contrast over groups
+  # is the stored difference; shared is the average surface.
+  expect_equal(length(fit$eta.diff), n2)
+  expect_true(all(is.finite(fit$sd.dif)))
+})
+
+test_that("structure='independent' remains the default contrast model", {
+  skip_if_not_installed("sf")
+  dat <- simulate_ata(n_coarse = 8L, n_fine_per = 4L, seed = 9L, spatial_amp = 0.4)
+  set.seed(103)
+  y1 <- as.numeric(dat$C %*% rpois(dat$n_fine, dat$gamma))
+  y2 <- as.numeric(dat$C %*% rpois(dat$n_fine, dat$gamma))
+  fit <- clgam_contrast(
+    y = c(y1, y2),
+    x1 = c(dat$x1, dat$x1), x2 = c(dat$x2, dat$x2),
+    exposure = c(dat$efine, dat$efine),
+    C1 = dat$C, C2 = dat$C,
+    knots = c(4L, 4L), elements = FALSE
+  )
+  expect_identical(fit$structure, "independent")
+  expect_true(grepl("^spatial\\.g1", names(fit$var.comp)[1]))
+})
+
 test_that("pois_incat_SOP validates equal-sized stacked groups", {
   skip_if_not_installed("sf")
   dat <- simulate_ata(n_coarse = 6L, n_fine_per = 4L, seed = 2L, spatial_amp = 0.4)

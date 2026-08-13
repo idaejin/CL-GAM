@@ -1,6 +1,6 @@
 # `clgam` R package
 
-**Version 0.1.23.** Composite link **generalized additive (mixed) models** for areal counts:
+**Version 0.1.25.** Composite link **generalized additive (mixed) models** for areal counts:
 disaggregate coarse Poisson (or quasi-Poisson) observations to a nested fine support via a composition
 matrix \(C\), with anisotropic spatial P-splines and optional fine-scale smooth
 covariates. Estimation uses PIRLS + separation of overlapping precision matrices (SOP).
@@ -13,8 +13,8 @@ Call `simulate_ata_scenarios()` for every named DGP and the recommended formula.
 ## Install
 
 ```r
-# remotes::install_github("idaejin/clgam")  # when published
-# from a local clone:
+remotes::install_github("idaejin/CL-GAM", subdir = "clgam")
+# from a local clone of this package directory:
 install.packages(".", repos = NULL, type = "source")
 ```
 
@@ -28,14 +28,19 @@ simulate_ata_scenarios()[, c("scenario", "formula", "orth.smooth")]
 dat <- simulate_ata(scenario = "A", n_coarse = 16, n_fine_per = 8, seed = 1)
 # dat$sf_coarse / dat$sf_fine are nested Voronoi polygons (requires sf)
 
-# Formula interface (y is coarse; s() covariates are fine)
+# Formula interface (y is coarse; s() covariates are fine).
+# Bare z is linear; s(z) is a P-spline. See ?clgam::s (not mgcv::s).
+# P-spline settings: ndx (intervals), bdeg (degree, default 3),
+# pord (penalty order, default 2). k is an alias for ndx.
 fit <- clgam(
-  y ~ s(x1, x2) + s(z_f),
+  y ~ s(x1, x2, ndx = c(10, 10), bdeg = 3, pord = 2) +
+    s(z_f, ndx = 12),
   data = dat,
-  knots = c(10, 10),
-  knots_nl = 12,
-  orth.smooth = FALSE   # paper recovery of Cases A--C
+  orth.smooth = TRUE
 )
+# Optional: Laplace (requires TMB) and/or coarse iid overdispersion
+# clgam(y ~ s(x1, x2) + s(z_f), data = dat, method = "Laplace")
+# clgam(y ~ s(x1, x2) + s(z_f), data = dat, re = "coarse")
 
 # Same model with C and exposure named:
 # clgam(y ~ s(x1, x2) + s(z), C = C, exposure = ef, orth.smooth = TRUE)
@@ -49,7 +54,7 @@ fit_pos <- clgam(
   smooth = dat$nlcovfine,
   knots = c(10, 10),
   knots_nl = 12,
-  orth.smooth = FALSE
+  orth.smooth = TRUE
 )
 # Overdispersion: same fitted surface, SEs scaled by sqrt(phi)
 fit_qp <- clgam(

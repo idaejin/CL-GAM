@@ -2,6 +2,8 @@
 
 S3method(AIC,clgam)
 S3method(BIC,clgam)
+S3method(clgam_contrast_infer,clgam)
+S3method(clgam_contrast_infer,default)
 S3method(coef,clgam)
 S3method(deviance,clgam)
 S3method(fitted,clgam)
@@ -19,9 +21,11 @@ export(as_comp_C)
 export(bbasis)
 export(clgam)
 export(clgam_contrast)
+export(clgam_contrast_infer)
 export(clmm_mat)
 export(kappa_diagnostic)
 export(mm_basis)
+export(pois_Laplace)
 export(pois_PCLM_latent)
 export(pois_SAP)
 export(pois_SOP)
@@ -65,6 +69,7 @@ importFrom(stats,
   logLik,
   median,
   model.matrix,
+  nlminb,
   nobs,
   predict,
   residuals,

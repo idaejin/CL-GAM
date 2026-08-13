@@ -16,6 +16,7 @@ clgam_contrast(
   knots = c(15L, 15L),
   elements = TRUE,
   family = stats::poisson(),
+  structure = c("independent", "contrast"),
   ...
 )
 }
@@ -41,9 +42,32 @@ clgam_contrast(
 Poisson; Pearson \eqn{\hat\phi} is stored in \code{fit$phi} and SEs are
 scaled by \eqn{\sqrt{\hat\phi}}.}
 
-\item{...}{further arguments to \code{pois_SOP} (e.g. \code{nl.basis="legacy"}
-for archival SMiMR behaviour)}
+\item{structure}{\code{"independent"} (default; two spatial fields, as
+in the manuscript) or \code{"contrast"} (shared field plus
+difference: \eqn{\eta_1=f+d}, \eqn{\eta_2=f-d}).}
+
+\item{...}{further arguments to \code{pois_SOP} or \code{pois_Laplace}
+(e.g. \code{nl.basis="legacy"} for archival SMiMR behaviour)}
 }
 \description{
 Fit a two-group CL-GAMM contrast (e.g. sex)
+}
+\details{
+Pointwise inference uses Bayesian SEs conditional on
+\eqn{\widehat{\tau}^2} (the same linear functional of the joint
+mixed-model covariance in both structures). With \code{elements=TRUE}
+the fit stores \code{sd.eta} (stacked predictors), \code{sd.dif} for
+\eqn{\widehat{\eta}_1-\widehat{\eta}_2} (accounts for
+\eqn{\mathrm{Cov}(\eta_1,\eta_2)}), \code{sd.shared} for
+\eqn{(\widehat{\eta}_1+\widehat{\eta}_2)/2}, and \code{sd.dif2}
+(\eqn{\sqrt{\mathrm{se}_1^2+\mathrm{se}_2^2}}, which ignores that
+covariance). Use \code{\link{clgam_contrast_infer}(fit)} for the
+difference surface (unconditional SEs by default). Under
+\code{structure="contrast"}
+and a shared fine grid, the shared random field cancels in the
+difference, so \code{sd.dif} is the SE of \eqn{2\widehat{d}} plus the
+fixed group contrast.
+}
+\seealso{
+\code{\link{clgam_contrast_infer}}, \code{\link{pois_incat_SOP}}
 }

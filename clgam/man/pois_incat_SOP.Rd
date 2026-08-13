@@ -27,7 +27,8 @@ pois_incat_SOP(
   elements = FALSE,
   decom = 1,
   sparse.backend = "auto",
-  family = stats::poisson()
+  family = stats::poisson(),
+  structure = c("independent", "contrast")
 )
 
 pois_incat_SAP(
@@ -52,7 +53,8 @@ pois_incat_SAP(
   elements = FALSE,
   decom = 1,
   sparse.backend = "auto",
-  family = stats::poisson()
+  family = stats::poisson(),
+  structure = c("independent", "contrast")
 )
 }
 \arguments{
@@ -76,9 +78,19 @@ pois_incat_SAP(
 
 \item{family}{\code{poisson()} or \code{quasipoisson()} (see
 \code{\link{pois_SOP}})}
+
+\item{structure}{\code{"independent"} (default; two separate spatial
+fields, manuscript sex contrast) or \code{"contrast"}: shared field
+plus difference with the sum-to-zero restriction
+\eqn{\eta_1=f+d}, \eqn{\eta_2=f-d} on the smooth spatial deviation.}
 }
 \value{
-A \code{"clgam"} object with group surfaces and optional difference SEs.
+A \code{"clgam"} object with stacked \code{eta}, \code{eta.diff},
+  \code{eta.shared}, and (if \code{elements=TRUE}) Bayesian SEs
+  \code{sd.eta}, \code{sd.dif}, \code{sd.shared}, and the independence
+  approximation \code{sd.dif2}. Use \code{\link{clgam_contrast_infer}}
+  for pointwise intervals; \code{sd.dif} (not \code{sd.dif2}) is the SE
+  for \eqn{\eta_1-\eta_2}.
 }
 \description{
 Prefer \code{\link{clgam_contrast}} in new code.

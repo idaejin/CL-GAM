@@ -15,11 +15,21 @@
 #'   as in \code{\link{pois_SOP}}
 #' @param family \code{poisson()} or \code{quasipoisson()} (see
 #'   \code{\link{pois_SOP}})
-#' @return A \code{"clgam"} object with group surfaces and optional difference SEs.
+#' @param structure \code{"independent"} (default; two separate spatial
+#'   fields, manuscript sex contrast) or \code{"contrast"}: shared field
+#'   plus difference with the sum-to-zero restriction
+#'   \eqn{\eta_1=f+d}, \eqn{\eta_2=f-d} on the smooth spatial deviation.
+#' @return A \code{"clgam"} object with stacked \code{eta}, \code{eta.diff},
+#'   \code{eta.shared}, and (if \code{elements=TRUE}) Bayesian SEs
+#'   \code{sd.eta}, \code{sd.dif}, \code{sd.shared}, and the independence
+#'   approximation \code{sd.dif2}. Use \code{\link{clgam_contrast_infer}}
+#'   for pointwise intervals; \code{sd.dif} (not \code{sd.dif2}) is the SE
+#'   for \eqn{\eta_1-\eta_2}.
 #' @export
 #' @seealso \code{\link{clgam_contrast}}, \code{\link{pois_SOP}}
-pois_incat_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, cat, Ccat1, Ccat2, x1lim = NULL, x2lim = NULL, ndx = c(15, 15), bdeg = c(3, 3), pord = c(2, 2), thr = c(1e-06, 1e-06), maxit = c(100, 100), parold = c(1, 1, 1, 1), bold = NULL, trace = FALSE, elements = FALSE, decom = 1, sparse.backend = "auto", family = stats::poisson()) {
+pois_incat_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, cat, Ccat1, Ccat2, x1lim = NULL, x2lim = NULL, ndx = c(15, 15), bdeg = c(3, 3), pord = c(2, 2), thr = c(1e-06, 1e-06), maxit = c(100, 100), parold = c(1, 1, 1, 1), bold = NULL, trace = FALSE, elements = FALSE, decom = 1, sparse.backend = "auto", family = stats::poisson(), structure = c("independent", "contrast")) {
   fam <- .resolve_clgam_family(family)
+  structure <- match.arg(structure)
   start.all <- proc.time()[3]
   dimfine <- length(x1)
   # The difference-surface machinery below (`elements=TRUE`: sd.dif,
@@ -92,8 +102,26 @@ pois_incat_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, cat, Ccat1,
   Z.aux <- cbind(rten2(Z2, X1), rten2(X2, Z1), rten2(Z2, Z1))
 
   # Build mixed model matrices
+  cat <- droplevels(as.factor(cat))
+  if (nlevels(cat) != 2L) {
+    stop("pois_incat_SOP: 'cat' must have exactly two levels.", call. = FALSE)
+  }
   X <- model.matrix(rep(1, dimfine)~cat*X.aux[,-1])
-  Z <- model.matrix(rep(1, dimfine)~(Z.aux):cat-1)
+  if (identical(structure, "contrast")) {
+    # Sum-to-zero: eta_1 = f + d, eta_2 = f - d on the spatial deviation.
+    # Columns: shared Z.aux, then +/- Z.aux (first level +, second -).
+    sgn <- ifelse(cat == levels(cat)[1L], 1, -1)
+    Z <- cbind(Z.aux, Z.aux * as.numeric(sgn))
+  } else {
+    Z <- model.matrix(rep(1, dimfine)~(Z.aux):cat-1)
+  }
+  if (ncol(Z) != sum(np[-1])) {
+    stop(
+      "pois_incat_SOP: Z has ", ncol(Z), " columns; expected ",
+      sum(np[-1]), " random coefficients.",
+      call. = FALSE
+    )
+  }
 
   # Include fine-scale covariates linearly
   if (!is.null(lcovfine)) {
@@ -239,16 +267,26 @@ pois_incat_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, cat, Ccat1,
   .clgam_report(trace, i, la, tol, comp.time)
 
   edf <- c(ed1, ed2, ed3, ed4)
-  vc_names <- c("spatial.g1.x1", "spatial.g1.x2", "spatial.g2.x1", "spatial.g2.x2")
+  vc_names <- if (identical(structure, "contrast")) {
+    c("spatial.shared.x1", "spatial.shared.x2",
+      "spatial.contrast.x1", "spatial.contrast.x2")
+  } else {
+    c("spatial.g1.x1", "spatial.g1.x2", "spatial.g2.x1", "spatial.g2.x2")
+  }
   if (length(la) == length(vc_names)) names(la) <- vc_names
   names(edf) <- vc_names[seq_along(edf)]
+
+  n2 <- dimfine / 2
+  eta.diff <- as.numeric(eta[seq_len(n2)] - eta[(n2 + 1):dimfine])
+  eta.shared <- as.numeric(0.5 * (eta[seq_len(n2)] + eta[(n2 + 1):dimfine]))
 
   out <- list(
     ndx = ndx, bdeg = bdeg, pord = pord,
     knots1 = MM1$knots, knots2 = MM2$knots,
     y = y, x1 = x1, x2 = x2, efine = efine,
     lcovfine = lcovfine, cat = cat,
-    eta = eta, gamma = gamma, mu = mu,
+    eta = eta, eta.diff = eta.diff, eta.shared = eta.shared,
+    gamma = gamma, mu = mu,
     var.comp = la, edf = edf,
     niter = i, elapsed.time = comp.time,
     diverged = diverged,
@@ -258,8 +296,10 @@ pois_incat_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, cat, Ccat1,
     b.fixed = b.fixed, b.random = b.random,
     matlist = list(
       B1 = MM1$B, B2 = MM2$B, D1 = MM1$D, D2 = MM2$D,
-      X = X, Z = Z, C = C, Ginv = Ginv
-    )
+      X = X, Z = Z, C = C, C1 = Ccat1, C2 = Ccat2, Ginv = Ginv
+    ),
+    method = "SOP",
+    structure = structure
   )
 
   if (isTRUE(elements)) {
@@ -292,8 +332,18 @@ pois_incat_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, cat, Ccat1,
     )
     n2 <- dimfine / 2
     B <- cbind(X, Z)
-    Dmat <- B[seq_len(n2), , drop = FALSE] - B[(n2 + 1):dimfine, , drop = FALSE]
+    B1 <- B[seq_len(n2), , drop = FALSE]
+    B2 <- B[(n2 + 1):dimfine, , drop = FALSE]
+    # Joint Bayesian SEs (conditional on tau^2). sd.dif uses Cov(eta1, eta2)
+    # and is the SE for inference on eta1-eta2 under both structures.
+    # sd.dif2 ignores that covariance (independence approximation). When
+    # Corr(eta1, eta2) > 0, Var(eta1-eta2) is smaller than se1^2+se2^2, so
+    # sd.dif2 is conservative for the difference. sd.shared is SE of
+    # (eta1+eta2)/2.
+    Dmat <- B1 - B2
+    Amat <- 0.5 * (B1 + B2)
     sd.dif <- sqrt(.quad_diag(Dmat, M1$S))
+    sd.shared <- sqrt(.quad_diag(Amat, M1$S))
     sd.dif2 <- sqrt(sd.eta[seq_len(n2)]^2 + sd.eta[-seq_len(n2)]^2)
     out$ed <- ed
     out$aic <- c(aic1, aic2)
@@ -303,6 +353,7 @@ pois_incat_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, cat, Ccat1,
     out$sd.eta <- sd.eta
     out$sd.dif <- sd.dif
     out$sd.dif2 <- sd.dif2
+    out$sd.shared <- sd.shared
   }
 
   ed_fallback <- np[1] + sum(out$edf)

@@ -2,11 +2,13 @@
 % Please edit documentation in R/utils.R
 \name{.ginvsp_from_la}
 \alias{.ginvsp_from_la}
-\title{Diagonal penalty inverse vector ginvsp for spatial + optional nl smooths.}
+\title{Diagonal penalty inverse vector ginvsp for spatial + optional nl smooths
+and optional coarse RE.}
 \usage{
-.ginvsp_from_la(la, g2u, g1u, g2b, g1b, dk = NULL)
+.ginvsp_from_la(la, g2u, g1u, g2b, g1b, dk = NULL, n_re = 0L)
 }
 \description{
-Diagonal penalty inverse vector ginvsp for spatial + optional nl smooths.
+Diagonal penalty inverse vector ginvsp for spatial + optional nl smooths
+and optional coarse RE.
 }
 \keyword{internal}

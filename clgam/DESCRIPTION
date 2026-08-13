@@ -1,7 +1,7 @@
 Package: clgam
 Type: Package
 Title: Composite Link Generalized Additive (Mixed) Models
-Version: 0.1.23
+Version: 0.1.25
 Authors@R: c(
     person("Diego", "Ayma Anza", role = "aut",
            email = "dayma@est-econ.uc3m.es"),
@@ -27,11 +27,12 @@ Imports:
     spam (>= 2.1-1)
 Suggests:
     sf (>= 1.0-0),
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    TMB
 LinkingTo:
     Rcpp,
     RcppArmadillo
 Config/testthat/edition: 3
-URL: https://github.com/idaejin/clgam
-BugReports: https://github.com/idaejin/clgam/issues
+URL: https://github.com/idaejin/CL-GAM
+BugReports: https://github.com/idaejin/CL-GAM/issues
 Config/roxygen2/version: 8.1.0

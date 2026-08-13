@@ -1,3 +1,40 @@
+# clgam 0.1.25
+
+* Formula `s()` accepts P-spline settings
+  `s(x1, x2, ndx = c(15, 15), bdeg = 3, pord = 2)` (defaults
+  `bdeg = 3`, `pord = 2`). `k` remains an alias for `ndx`. Univariate
+  terms use the same arguments (`ndxnl` / `bdegnl` / `pordnl`).
+* Cases A/C in `simulate_ata()` default to identified spatial truth
+  `f_perp = (I - P_{B(z_f)}) f_raw` (`identifying="perp"`), matching
+  `orth.smooth=TRUE`. Case B unchanged. Pass `identifying="unrestricted"`
+  for the older A--C DGP. `simulate_ata_scenarios()` now recommends
+  `orth.smooth=TRUE` for A--C.
+* `clgam(..., method = "SOP")` (default) or `method = "Laplace"` (TMB
+  Laplace on the same P-spline mixed-model design; Suggests: TMB).
+  Quasi-Poisson is allowed with Laplace: same Poisson Laplace fit;
+  SEs from `sdreport` are scaled by `sqrt(phi)`.
+* Optional `re = "coarse"`: iid Gaussian random effect per coarse
+  count, `\mu_i = [C(e exp \eta)]_i exp(u_i)`. Stored `eta` is the
+  structured fine surface; `fit$re` holds `u`. Requires a nested
+  partition `C`.
+* `clgam_contrast(..., structure = "contrast")`: shared spatial field
+  plus difference with `\eta_1 = f + d`, `\eta_2 = f - d`. Default
+  `structure = "independent"` is the manuscript two-field sex model.
+  Pointwise inference: `clgam_contrast_infer(fit)` on a `clgam` contrast
+  object (difference surface, unconditional SEs, Wald `z` / `p.value`).
+  `predict(..., type="diff"|"shared", se.fit=TRUE)` and `plot(fit, which=7)`.
+  Use `sd.dif`, not `sd.dif2`. Pass `uncond=FALSE` for faster conditional SEs.
+
+# clgam 0.1.24
+
+* Formula linear terms: `y ~ s(x1, x2) + z` (bare name or `I(z)`) is
+  equivalent to `linear=`; `s(z)` remains a P-spline. Documented name
+  clash with `mgcv::s` (`?clgam::s`).
+* Repository URLs point at `idaejin/CL-GAM` (install with
+  `remotes::install_github("idaejin/CL-GAM", subdir = "clgam")`).
+* Internal Rd for `trprod`, `rten2`, `bblock2`, `bblock3`, and
+  `mm_basis` no longer has TODO placeholders.
+
 # clgam 0.1.23
 
 * Formula interface: `clgam(y ~ s(x1, x2) + s(z), C = C, exposure = ef,

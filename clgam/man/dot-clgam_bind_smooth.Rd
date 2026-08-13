@@ -2,11 +2,11 @@
 % Please edit documentation in R/clgam-formula.R
 \name{.clgam_bind_smooth}
 \alias{.clgam_bind_smooth}
-\title{Bind formula smooths; expand length-\code{n_coarse} vectors via partition \code{C}}
+\title{Bind formula covariates; expand length-\code{n_coarse} vectors via partition \code{C}}
 \usage{
 .clgam_bind_smooth(cols, C)
 }
 \description{
-Bind formula smooths; expand length-\code{n_coarse} vectors via partition \code{C}
+Bind formula covariates; expand length-\code{n_coarse} vectors via partition \code{C}
 }
 \keyword{internal}

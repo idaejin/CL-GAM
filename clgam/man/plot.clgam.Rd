@@ -19,7 +19,8 @@
 
 \item{which}{which plot(s): \code{1} fine \eqn{\hat\eta}; \code{2} y vs
 \eqn{\hat\mu}; \code{3} residuals; \code{4} smooth; \code{5} contrast;
-\code{6} coarse map of \eqn{y-\hat\mu}}
+\code{6} coarse map of \eqn{y-\hat\mu}; \code{7} classified contrast
+(\eqn{\widehat{\eta}_1-\widehat{\eta}_2} vs \code{sd.dif})}
 
 \item{ask}{ask before each plot when length(which) > 1}
 

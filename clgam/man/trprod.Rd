@@ -7,12 +7,11 @@
 trprod(A, B)
 }
 \arguments{
-\item{A}{TODO}
-
-\item{B}{TODO}
+\item{A, B}{numeric matrices of compatible dimensions}
 }
 \value{
-TODO
+Scalar \eqn{\mathrm{tr}(A B)}, computed as
+  \code{sum(A * t(B))} without forming \code{A \%*\% B}.
 }
 \description{
 This function efficiently computes the trace of the product of two matrices \code{A} and \code{B}.

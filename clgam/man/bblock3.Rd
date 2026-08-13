@@ -7,26 +7,10 @@
 bblock3(A11, A12, A13, A21, A22, A23, A31, A32, A33)
 }
 \arguments{
-\item{A11}{TODO}
-
-\item{A12}{TODO}
-
-\item{A13}{TODO}
-
-\item{A21}{TODO}
-
-\item{A22}{TODO}
-
-\item{A23}{TODO}
-
-\item{A31}{TODO}
-
-\item{A32}{TODO}
-
-\item{A33}{TODO}
+\item{A11, A12, A13, A21, A22, A23, A31, A32, A33}{blocks of the partitioned matrix}
 }
 \value{
-TODO
+The assembled three-by-three block matrix.
 }
 \description{
 This function recovers a partitioned matrix from three-by-three blocks.

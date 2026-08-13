@@ -2,11 +2,11 @@
 % Please edit documentation in R/clgam-formula.R
 \name{.clgam_parse_formula}
 \alias{.clgam_parse_formula}
-\title{Parse a CL-GAM formula \code{y ~ s(x1, x2) + s(z)}}
+\title{Parse a CL-GAM formula \code{y ~ s(x1, x2) + s(z)} / \code{+ z}}
 \usage{
 .clgam_parse_formula(formula, data = NULL, env = parent.frame())
 }
 \description{
-Parse a CL-GAM formula \code{y ~ s(x1, x2) + s(z)}
+Parse a CL-GAM formula \code{y ~ s(x1, x2) + s(z)} / \code{+ z}
 }
 \keyword{internal}

@@ -66,10 +66,12 @@
 #' \eqn{\rightarrow} \code{"confounding"}; \code{"matern"} \eqn{\rightarrow}
 #' \code{"matern1"}.
 #'
-#' Recovery of Cases A--C in the manuscript uses \code{orth.smooth = FALSE}.
-#' The confounding / identifiability experiment (and Madrid Case A) uses
-#' \code{orth.smooth = TRUE}. Misspecification DGPs (Matern, jump) are
-#' spatial-only.
+#' Cases A and C generate residual spatial truth \eqn{f_\perp=(I-P_{B(z_{\mathrm{f}})})f_{\mathrm{raw}}}
+#' (same projection as \code{orth.smooth=TRUE}). Case B is unchanged
+#' (coarse \eqn{h} is not in \eqn{A_{\mathrm{f}}}). Confounding remains the
+#' \eqn{\rho}-mixing stress test. Pass \code{identifying="unrestricted"} to
+#' reproduce the older A/C DGP \eqn{\eta=f_{\mathrm{raw}}+g}. Misspecification
+#' DGPs (Matern, jump) are spatial-only.
 #'
 #' @return A \code{data.frame}.
 #' @seealso \code{\link{simulate_ata}}, \code{\link{clgam}}, \code{\link{s}}
@@ -119,12 +121,12 @@ simulate_ata_scenarios <- function() {
       "y ~ s(x1, x2)",
       "y ~ s(x1, x2)"
     ),
-    orth.smooth = c(TRUE, FALSE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE),
+    orth.smooth = c(TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE),
     notes = c(
-      "No scenario=; trigonometric spatial field. Covariate off unless include_covariate=TRUE (then quadratic g(z)).",
-      "Paper recovery of Case A (fine sine). Pass orth.smooth=FALSE.",
-      "Paper recovery of Case B (coarse sine, constant within coarse units).",
-      "Paper recovery of Case C (tanh desc/asc pair). z_a is expanded through C.",
+      "No scenario=; trigonometric spatial field. Covariate off unless include_covariate=TRUE (then quadratic g(z); identifying='perp' if fine).",
+      "Case A: eta = f_perp + g(z_f), z independent Uniform, sine. Fit orth.smooth=TRUE.",
+      "Case B: eta = f + h(z_a), coarse sine. Restriction is a no-op; fit orth.smooth=TRUE.",
+      "Case C: eta = f_perp + g(z_f) + h(z_a); f_perp vs B(z_f) only. Fit orth.smooth=TRUE.",
       "Identifiability DGP: z = rho * f_std + sqrt(1-rho^2) * eps; eta = a_f * f_perp + a_g * g(z). Override rho. Alias: identifiability.",
       "Misspecification: Matern GP, nu=1, range=0.3. Not a P-spline. Alias of scenario='matern'.",
       "Misspecification: Matern GP, nu=2, range=0.3.",
@@ -361,6 +363,16 @@ simulate_ata_scenarios <- function() {
   )$B
 }
 
+#' Residual spatial field \eqn{f_\perp=(I-P_{B(z)})f} for identified A/C DGPs
+#' @noRd
+.clgam_f_perp_from_z <- function(eta_spatial, z_f, ndxnl = 10L, bdegnl = 3L) {
+  f_raw <- as.numeric(eta_spatial) - mean(as.numeric(eta_spatial))
+  Af <- .clgam_Bz(z_f, ndxnl = ndxnl, bdegnl = bdegnl)
+  f_perp <- as.numeric(.orth_cols(cbind(f_raw), Af)[, 1L])
+  kappa <- .kappa_overlap(f_raw, Af, center = TRUE)
+  list(f_raw = f_raw, f_perp = f_perp, kappa = kappa)
+}
+
 #' Mix a standardized spatial field with an independent smooth residual
 #' @noRd
 .clgam_confound_z <- function(f_raw, x1, x2, rho) {
@@ -450,12 +462,18 @@ simulate_ata_scenarios <- function() {
 #' @param a_f,a_g optional confounding scales. If both are \code{NULL} they
 #'   are calibrated from \code{comp_sd} as described above.
 #' @param ndxnl,bdegnl B-spline size for \eqn{A_f=\mathrm{span}\{B(z)\}} when
-#'   computing \eqn{\kappa} and \eqn{f_\perp} (confounding DGP only)
+#'   computing \eqn{\kappa} and \eqn{f_\perp}
+#' @param identifying \code{"perp"} (default): when a fine covariate is present
+#'   (Case A/C), replace the spatial field by
+#'   \eqn{f_\perp=(I-P_{B(z_{\mathrm{f}})})f_{\mathrm{raw}}} so the DGP matches
+#'   \code{orth.smooth=TRUE}. \code{"unrestricted"} keeps \eqn{f_{\mathrm{raw}}}
+#'   (older A--C recovery tables). Ignored for Case B and for the
+#'   \code{rho} confounding DGP (already \eqn{f_\perp}).
 #'
 #' @return A list with \code{y}, \code{y_fine}, \code{C}, \code{x1}/\code{x2},
 #'   \code{efine}, \code{gamma}, \code{sf_coarse}/\code{sf_fine}, and truth.
-#'   Confounding draws also store \code{rho}, \code{kappa}, \code{f_raw},
-#'   \code{f_perp}, \code{a_f}, \code{a_g}. Misspecification draws store
+#'   Confounding and identified Case A/C draws also store \code{kappa},
+#'   \code{f_raw}, \code{f_perp}. Misspecification draws store
 #'   \code{spatial_truth} and, for \code{"jump"}, \code{jump_group}.
 #'
 #' @section Simulation scenarios:
@@ -465,16 +483,18 @@ simulate_ata_scenarios <- function() {
 #'     \code{include_covariate=TRUE} (then centred quadratic \eqn{g(z)}).
 #'     Fit \code{clgam(y ~ s(x1, x2), C = C, exposure = ef)}.}
 #'   \item{\code{"A"}}{\eqn{n=40}, \eqn{m=400}, spatial amplitude \eqn{0.8}, fine sine
-#'     of amplitude \eqn{1.2}. Recovery:
-#'     \code{clgam(y ~ s(x1, x2) + s(z_f), ..., orth.smooth = FALSE)}.}
+#'     of amplitude \eqn{1.2}. Spatial truth is \eqn{f_\perp} against
+#'     \eqn{B(z_{\mathrm{f}})}. Fit
+#'     \code{clgam(y ~ s(x1, x2) + s(z_f), ..., orth.smooth = TRUE)}.}
 #'   \item{\code{"B"}}{Same sine on the coarse covariate \eqn{z_a} (constant
-#'     within coarse units). Recovery:
-#'     \code{clgam(y ~ s(x1, x2) + s(z_a, level = "coarse"), ...,
-#'     orth.smooth = FALSE)}.}
+#'     within coarse units). Spatial truth remains unrestricted \eqn{f}.
+#'     Fit \code{clgam(y ~ s(x1, x2) + s(z_a, level = "coarse"), ...,
+#'     orth.smooth = TRUE)} (restriction is a no-op).}
 #'   \item{\code{"C"}}{Spatial amplitude \eqn{0.75}, descending/ascending
-#'     \eqn{\tanh} pair of amplitude \eqn{1.2}. Recovery:
+#'     \eqn{\tanh} pair of amplitude \eqn{1.2}. Spatial truth is \eqn{f_\perp}
+#'     against the fine \eqn{B(z_{\mathrm{f}})} only. Fit
 #'     \code{clgam(y ~ s(x1, x2) + s(z_f) + s(z_a, level = "coarse"), ...,
-#'     orth.smooth = FALSE)}.}
+#'     orth.smooth = TRUE)}.}
 #'   \item{\code{"confounding"}}{Case A identifiability DGP
 #'     \eqn{z=\rho f_{\mathrm{std}}+\sqrt{1-\rho^2}\varepsilon},
 #'     \eqn{\eta=a_f f_\perp+a_g g(z)}. Default \eqn{\rho=0} (override with
@@ -521,6 +541,7 @@ simulate_ata <- function(n_coarse = 12L,
                          a_g = NULL,
                          ndxnl = 10L,
                          bdegnl = 3L,
+                         identifying = c("perp", "unrestricted"),
                          spatial_truth = c("pspline", "matern", "jump"),
                          matern_nu = 1,
                          matern_range = 0.3,
@@ -530,6 +551,7 @@ simulate_ata <- function(n_coarse = 12L,
          call. = FALSE)
   }
   family <- match.arg(family)
+  identifying <- match.arg(identifying)
   if (!is.null(scenario)) {
     spec <- .clgam_paper_spec(scenario)
     if (missing(n_coarse)) n_coarse <- spec$n_coarse
@@ -688,7 +710,14 @@ simulate_ata <- function(n_coarse = 12L,
       g_true <- as.numeric(amps[1] * funs[[1]](z_f))
       g_true <- g_true - mean(g_true)
       nlcovfine <- cbind(z_f = z_f)
-      eta <- eta + g_true
+      if (identical(identifying, "perp")) {
+        proj <- .clgam_f_perp_from_z(eta_spatial, z_f, ndxnl, bdegnl)
+        f_raw <- proj$f_raw
+        f_perp <- proj$f_perp
+        kappa <- proj$kappa
+        eta_spatial <- f_perp
+      }
+      eta <- eta_spatial + g_true
     } else if (identical(covariate_level, "coarse")) {
       case <- "B"
       funs <- .clgam_resolve_nl_fun(nl_fun, 1L)
@@ -700,9 +729,9 @@ simulate_ata <- function(n_coarse = 12L,
       h_true <- h_a[coarse_id]
       g_true <- h_true
       nlcovfine <- cbind(z_a = z)
-      eta <- eta + h_true
+      eta <- eta_spatial + h_true
     } else {
-      # Case C: g(z_f) + h(z_a)
+      # Case C: g(z_f) + h(z_a). Project f only vs fine B(z_f).
       case <- "C"
       funs <- .clgam_resolve_nl_fun(nl_fun, 2L)
       amps <- .as_amps(nl_amp, 2L)
@@ -715,7 +744,14 @@ simulate_ata <- function(n_coarse = 12L,
       h_true <- h_a[coarse_id]
       z <- z_f
       nlcovfine <- cbind(z_f = z_f, z_a = z_a[coarse_id])
-      eta <- eta + g_true + h_true
+      if (identical(identifying, "perp")) {
+        proj <- .clgam_f_perp_from_z(eta_spatial, z_f, ndxnl, bdegnl)
+        f_raw <- proj$f_raw
+        f_perp <- proj$f_perp
+        kappa <- proj$kappa
+        eta_spatial <- f_perp
+      }
+      eta <- eta_spatial + g_true + h_true
     }
   }
 
@@ -798,7 +834,8 @@ simulate_ata <- function(n_coarse = 12L,
     spatial_truth = spatial_truth,
     matern_nu = if (identical(spatial_truth, "matern")) as.numeric(matern_nu) else NA_real_,
     matern_range = if (identical(spatial_truth, "matern")) as.numeric(matern_range) else NA_real_,
-    jump_amp = if (identical(spatial_truth, "jump")) as.numeric(jump_amp) else NA_real_
+    jump_amp = if (identical(spatial_truth, "jump")) as.numeric(jump_amp) else NA_real_,
+    identifying = if (confound) "perp" else identifying
   )
   if (!is.null(jump_group)) out$jump_group <- as.integer(jump_group)
   if (!is.null(f_raw)) out$f_raw <- f_raw

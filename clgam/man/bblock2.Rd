@@ -7,16 +7,10 @@
 bblock2(A11, A12, A21, A22)
 }
 \arguments{
-\item{A11}{TODO}
-
-\item{A12}{TODO}
-
-\item{A21}{TODO}
-
-\item{A22}{TODO}
+\item{A11, A12, A21, A22}{blocks of the partitioned matrix}
 }
 \value{
-TODO
+The assembled matrix \code{rbind(cbind(A11, A12), cbind(A21, A22))}.
 }
 \description{
 This function recovers a partitioned matrix from two-by-two blocks.

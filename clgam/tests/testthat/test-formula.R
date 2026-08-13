@@ -62,11 +62,75 @@ test_that("s(..., k=) overrides knots when knots is omitted", {
   expect_equal(as.integer(fit$ndx), c(4L, 4L))
 })
 
-test_that("linear formula terms are rejected", {
-  expect_error(
-    clgam(y ~ s(x1, x2) + z, C = diag(4)),
-    "Linear terms"
+test_that("s(..., ndx, bdeg, pord) wires P-spline settings", {
+  set.seed(5)
+  n <- 25L
+  x1 <- rep(seq(0, 1, length.out = 5L), each = 5L)
+  x2 <- rep(seq(0, 1, length.out = 5L), times = 5L)
+  z <- stats::runif(n)
+  C <- diag(n)
+  y <- stats::rpois(n, lambda = 2)
+  fit <- clgam(
+    y ~ s(x1, x2, ndx = c(4, 4), bdeg = 3, pord = 2) +
+      s(z, ndx = 5, bdeg = 3, pord = 2),
+    C = C, exposure = 1,
+    elements = FALSE, trace = FALSE
   )
+  expect_equal(as.integer(fit$ndx), c(4L, 4L))
+  expect_equal(as.numeric(fit$bdeg), c(3, 3))
+  expect_equal(as.numeric(fit$pord), c(2, 2))
+  expect_equal(as.numeric(fit$ndxnl), 5)
+  expect_equal(as.numeric(fit$bdegnl), 3)
+  expect_equal(as.numeric(fit$pordnl), 2)
+
+  fit_p1 <- clgam(
+    y ~ s(x1, x2, ndx = 4, pord = 1),
+    C = C, exposure = 1,
+    elements = FALSE, trace = FALSE
+  )
+  expect_equal(as.numeric(fit_p1$pord), c(1, 1))
+  expect_equal(as.numeric(fit_p1$bdeg), c(3, 3))
+})
+
+test_that("ndx takes precedence over k in s()", {
+  expect_warning(
+    spec <- s(x1, x2, ndx = c(8, 8), k = c(4, 4)),
+    "Both ndx="
+  )
+  expect_equal(as.numeric(spec$ndx), c(8, 8))
+})
+
+test_that("linear formula terms match linear=", {
+  set.seed(4)
+  n <- 36L
+  x1 <- rep(seq(0, 1, length.out = 6L), each = 6L)
+  x2 <- rep(seq(0, 1, length.out = 6L), times = 6L)
+  z <- stats::runif(n)
+  C <- diag(n)
+  ef <- rep(1, n)
+  eta <- 0.3 * sin(2 * pi * x1) + 0.5 * z
+  y <- stats::rpois(n, lambda = exp(eta))
+
+  fit_pos <- clgam(
+    y, x1, x2, C,
+    exposure = ef, linear = cbind(z = z),
+    knots = c(4L, 4L),
+    elements = FALSE, trace = FALSE, orth.smooth = TRUE
+  )
+  fit_f <- clgam(
+    y ~ s(x1, x2) + z,
+    C = C, exposure = ef,
+    knots = c(4L, 4L),
+    elements = FALSE, trace = FALSE, orth.smooth = TRUE
+  )
+  fit_I <- clgam(
+    y ~ s(x1, x2) + I(z),
+    C = C, exposure = ef,
+    knots = c(4L, 4L),
+    elements = FALSE, trace = FALSE, orth.smooth = TRUE
+  )
+  expect_equal(fit_pos$eta, fit_f$eta, tolerance = 1e-8)
+  expect_equal(fit_pos$eta, fit_I$eta, tolerance = 1e-8)
 })
 
 test_that("Case B formula expands z_a and sets level='coarse'", {
@@ -99,9 +163,9 @@ test_that("simulate_ata_scenarios lists every preset", {
     sc$scenario,
     c("default", "A", "B", "C", "confounding", "matern1", "matern2", "jump")
   )
-  expect_equal(sc$orth.smooth[sc$scenario == "A"], FALSE)
-  expect_equal(sc$orth.smooth[sc$scenario == "B"], FALSE)
-  expect_equal(sc$orth.smooth[sc$scenario == "C"], FALSE)
+  expect_equal(sc$orth.smooth[sc$scenario == "A"], TRUE)
+  expect_equal(sc$orth.smooth[sc$scenario == "B"], TRUE)
+  expect_equal(sc$orth.smooth[sc$scenario == "C"], TRUE)
   expect_equal(sc$orth.smooth[sc$scenario == "confounding"], TRUE)
   expect_match(sc$formula[sc$scenario == "B"], "level = \"coarse\"")
   expect_equal(sc$formula[sc$scenario == "matern1"], "y ~ s(x1, x2)")

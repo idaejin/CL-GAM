@@ -185,6 +185,51 @@ test_that("nl_fun presets sine/tanh match the paper curves", {
   expect_gt(cor(h_coarse, ht), 0.999)
 })
 
+test_that("Case A/C identifying='perp' stores f_perp orthogonal to B(z_f)", {
+  skip_if_not_installed("sf")
+  dat <- simulate_ata(
+    n_coarse = 12L, n_fine_per = 4L, seed = 19L,
+    include_covariate = TRUE, nl_amp = 1.0, spatial_amp = 0.8,
+    nl_fun = "sine", family = "none"
+  )
+  expect_equal(dat$identifying, "perp")
+  expect_equal(length(dat$f_perp), dat$n_fine)
+  expect_equal(
+    as.numeric(dat$eta_true),
+    as.numeric(dat$f_perp + dat$g_true),
+    tolerance = 1e-10
+  )
+  expect_equal(as.numeric(dat$eta_spatial_true), as.numeric(dat$f_perp),
+               tolerance = 1e-10)
+  Af <- clgam:::.clgam_Bz(dat$z_f, ndxnl = 10L, bdegnl = 3L)
+  expect_lt(clgam:::.orth_cross_max(cbind(dat$f_perp), Af), 1e-8)
+  expect_true(is.finite(dat$kappa))
+  expect_gt(dat$kappa, 0)
+
+  old <- simulate_ata(
+    n_coarse = 12L, n_fine_per = 4L, seed = 19L,
+    include_covariate = TRUE, nl_amp = 1.0, spatial_amp = 0.8,
+    nl_fun = "sine", family = "none", identifying = "unrestricted"
+  )
+  expect_equal(old$identifying, "unrestricted")
+  expect_null(old$f_perp)
+  expect_equal(old$z_f, dat$z_f)
+  expect_gt(mean((old$eta_spatial_true - dat$eta_spatial_true)^2), 1e-8)
+
+  dat_c <- simulate_ata(
+    n_coarse = 10L, n_fine_per = 4L, seed = 20L,
+    include_covariate = TRUE, covariate_level = "both",
+    nl_amp = c(1, 1), spatial_amp = 0.6, family = "none"
+  )
+  expect_equal(
+    as.numeric(dat_c$eta_true),
+    as.numeric(dat_c$f_perp + dat_c$g_true + dat_c$h_true),
+    tolerance = 1e-10
+  )
+  Af_c <- clgam:::.clgam_Bz(dat_c$z_f, ndxnl = 10L, bdegnl = 3L)
+  expect_lt(clgam:::.orth_cross_max(cbind(dat_c$f_perp), Af_c), 1e-8)
+})
+
 test_that("scenario presets fill paper A/C defaults but stay overridable", {
   skip_if_not_installed("sf")
   dat_a <- simulate_ata(scenario = "A", n_coarse = 8L, n_fine_per = 4L,

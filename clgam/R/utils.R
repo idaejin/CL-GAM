@@ -208,7 +208,7 @@
   }
   s <- sqrt(phi)
   for (nm in c(
-    "sd.eta", "sd.exp.eta", "sd.dif", "sd.dif2",
+    "sd.eta", "sd.exp.eta", "sd.dif", "sd.dif2", "sd.shared",
     "sdleffects", "sdnleffects"
   )) {
     if (!is.null(out[[nm]])) {
@@ -234,15 +234,20 @@
   list(mat = opt.mat, M1 = M1, M2 = M2)
 }
 
-#' Diagonal penalty inverse vector ginvsp for spatial + optional nl smooths.
+#' Diagonal penalty inverse vector ginvsp for spatial + optional nl smooths
+#' and optional coarse RE.
 #' @keywords internal
-.ginvsp_from_la <- function(la, g2u, g1u, g2b, g1b, dk = NULL) {
+.ginvsp_from_la <- function(la, g2u, g1u, g2b, g1b, dk = NULL, n_re = 0L) {
   ginvsp <- c((1 / la[2]) * g2u, (1 / la[1]) * g1u,
               (1 / la[2]) * g2b + (1 / la[1]) * g1b)
   if (!is.null(dk) && length(dk)) {
     for (k in seq_along(dk)) {
       ginvsp <- c(ginvsp, (1 / la[k + 2L]) * dk[[k]])
     }
+  }
+  n_re <- as.integer(n_re)
+  if (n_re > 0L) {
+    ginvsp <- c(ginvsp, rep(1 / la[length(la)], n_re))
   }
   ginvsp
 }

@@ -11,8 +11,8 @@ P-splines and separation of overlapping precision matrices (SOP).
 \seealso{
 Useful links:
 \itemize{
-  \item \url{https://github.com/idaejin/clgam}
-  \item Report bugs at \url{https://github.com/idaejin/clgam/issues}
+  \item \url{https://github.com/idaejin/CL-GAM}
+  \item Report bugs at \url{https://github.com/idaejin/CL-GAM/issues}
 }
 
 }

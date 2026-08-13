@@ -20,12 +20,15 @@ clgam(
   family = stats::poisson(),
   data = NULL,
   orth.smooth = NULL,
+  method = c("SOP", "Laplace"),
+  re = NULL,
   ...
 )
 }
 \arguments{
 \item{y}{coarse counts, or a two-sided formula such as
-\code{y ~ s(x1, x2) + s(z)}}
+\code{y ~ s(x1, x2) + s(z)} or \code{y ~ s(x1, x2) + z} (bare names
+are linear)}
 
 \item{x1, x2}{fine-scale spatial coordinates (or pass \code{coords}).
 Ignored when \code{y} is a formula.}
@@ -37,7 +40,9 @@ Ignored when \code{y} is a formula.}
 \item{exposure}{fine-scale offset / expected counts. Optional when
 \code{data} supplies \code{efine}.}
 
-\item{linear}{optional fine-scale linear covariates}
+\item{linear}{optional fine-scale linear covariates. With a formula,
+a bare name \code{z} (or \code{I(z)}) is equivalent; if both are
+supplied, the formula terms are used.}
 
 \item{smooth}{optional covariates for univariate P-spline smooths
 (Case A/B/C). Matrix with one column (A or B) or two (Case C: fine then
@@ -52,10 +57,10 @@ With a formula, use \code{s(z, level = "coarse")} instead.}
 \item{coords}{optional \code{n_fine x 2} matrix}
 
 \item{knots}{spatial knot counts (\code{ndx}). Overridden by
-\code{s(x1, x2, k = )} when \code{knots} is not passed.}
+\code{s(x1, x2, ndx = )} (or \code{k = }) when \code{knots} is not passed.}
 
 \item{knots_nl}{knot count(s) for each smooth covariate (\code{ndxnl}).
-Overridden by \code{s(z, k = )} when \code{knots_nl} is not passed.}
+Overridden by \code{s(z, ndx = )} when \code{knots_nl} is not passed.}
 
 \item{elements}{compute AIC/BIC/SEs (default \code{TRUE})}
 
@@ -70,39 +75,50 @@ A \code{\link{simulate_ata}} result also supplies \code{C} and
 
 \item{orth.smooth}{identifiability projection; see \code{\link{pois_SOP}}.
 Default \code{NULL} follows the basis (\code{TRUE} for P-splines).
-Manuscript recovery of Cases A--C uses \code{FALSE}; the confounding
-study uses \code{TRUE}. See \code{\link{simulate_ata_scenarios}}.}
+Identified Cases A--C use \code{TRUE} with DGP \eqn{f_\perp}; pass
+\code{identifying="unrestricted"} in \code{\link{simulate_ata}} to
+reproduce the older tables. See \code{\link{simulate_ata_scenarios}}.}
 
-\item{...}{further arguments to \code{pois_SOP} (e.g. \code{nl.basis="legacy"}
-for archival SMiMR behaviour)}
+\item{method}{\code{"SOP"} (default; PIRLS + SOP) or \code{"Laplace"}
+(TMB Laplace on the same mixed-model design; requires \pkg{TMB}).}
+
+\item{re}{\code{NULL}/\code{"none"} or \code{"coarse"} (iid random
+effect per coarse count). See \code{\link{pois_SOP}}.}
+
+\item{...}{further arguments to \code{pois_SOP} or \code{pois_Laplace}
+(e.g. \code{nl.basis="legacy"} for archival SMiMR behaviour)}
 }
 \value{
 An object of class \code{"clgam"}. Formula fits store
-  \code{fit$formula}.
+  \code{fit$formula}. \code{fit$method} is \code{"SOP"} or
+  \code{"Laplace"}; \code{fit$re_term} is \code{"none"} or
+  \code{"coarse"}.
 }
 \description{
 User-facing wrapper around \code{\link{pois_SOP}}. The first argument may
 be coarse counts (positional API) or an \pkg{mgcv}-style formula
 \code{y ~ s(x1, x2) + s(z)}. The formula is parsed by \pkg{clgam}; it is
-not evaluated by \pkg{mgcv}. Left-hand side \code{y} is \emph{coarse};
-\code{s()} covariates are on the \emph{fine} support (a length-\code{n_coarse}
-vector such as Case B \code{z_a} is expanded through partition \code{C}).
+not evaluated by \pkg{mgcv} (the symbol \code{s} is matched even if
+\code{mgcv::s} is attached; see \code{\link{s}}). Left-hand side \code{y}
+is \emph{coarse}; \code{s()} covariates are on the \emph{fine} support
+(a length-\code{n_coarse} vector such as Case B \code{z_a} is expanded
+through partition \code{C}). A bare name \code{z} is linear; \code{s(z)}
+is a P-spline.
 }
 \examples{
 \donttest{
 dat <- simulate_ata(scenario = "A", n_coarse = 12, n_fine_per = 4, seed = 1)
 fit <- clgam(
-  y ~ s(x1, x2) + s(z_f),
+  y ~ s(x1, x2, ndx = c(8, 8), bdeg = 3, pord = 2) + s(z_f, ndx = 10),
   data = dat,
-  knots = c(8, 8),
-  orth.smooth = FALSE
+  orth.smooth = TRUE
 )
 # Same call with C and exposure named (user-facing interface):
 # clgam(y ~ s(x1, x2) + s(z), C = C, exposure = ef, orth.smooth = TRUE)
 }
 }
 \seealso{
-\code{\link{s}}, \code{\link{pois_SOP}}, \code{\link{simulate_ata}},
+\code{\link{s}}, \code{\link{pois_SOP}}, \code{\link{pois_Laplace}}, \code{\link{simulate_ata}},
   \code{\link{simulate_ata_scenarios}}, \code{\link{kappa_diagnostic}},
   \code{\link{summary.clgam}}
 }

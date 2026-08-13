@@ -47,6 +47,15 @@
 #'   Pearson dispersion \eqn{\hat\phi} is estimated at convergence and all
 #'   standard errors (including effect SEs) are multiplied by
 #'   \eqn{\sqrt{\hat\phi}}. Negative binomial is not supported.
+#' @param re \code{NULL}/\code{"none"} (default) or \code{"coarse"}: an iid
+#'   Gaussian random effect per coarse observation, so
+#'   \eqn{\mu_i = [C(e\odot\exp\eta)]_i\exp(u_i)} with
+#'   \eqn{u_i\sim N(0,\sigma_u^2)}. Requires a nested 0-1 partition
+#'   \code{C}. The stored \code{eta} is the structured fine surface
+#'   (without \eqn{u}); \code{re} holds \eqn{\hat u}. Combining
+#'   \code{re="coarse"} with \code{quasipoisson()} is allowed but both
+#'   target overdispersion (a warning is issued).
+#' @param parold_re starting \eqn{\tau^2} for \code{re="coarse"}
 #' @return A \code{"clgam"} object with fine-scale \code{eta}, fitted means,
 #'   variance components, and optional SEs / AIC. Quasi-Poisson fits also
 #'   store \code{phi} and \code{deviance_df}.
@@ -60,8 +69,15 @@
 #' @export
 #' @seealso \code{\link{clgam}}, \code{\link{pois_incat_SOP}},
 #'   \code{\link{kappa_diagnostic}}
-pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL, C, x1lim = NULL, x2lim = NULL, ndx = c(15, 15), bdeg = c(3, 3), pord = c(2, 2), decom = 1, thr = c(1e-06, 1e-06), maxit = c(100, 100), parold = c(1, 1), bold = NULL, trace = FALSE, elements = FALSE, ndxnl = 15, bdegnl = 3, pordnl = 2, paroldnl = NULL, sparse.backend = "auto", nl.basis = c("legacy", "pspline"), orth.smooth = NULL, nl.level = NULL, family = stats::poisson()) {
+pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL, C, x1lim = NULL, x2lim = NULL, ndx = c(15, 15), bdeg = c(3, 3), pord = c(2, 2), decom = 1, thr = c(1e-06, 1e-06), maxit = c(100, 100), parold = c(1, 1), bold = NULL, trace = FALSE, elements = FALSE, ndxnl = 15, bdegnl = 3, pordnl = 2, paroldnl = NULL, sparse.backend = "auto", nl.basis = c("legacy", "pspline"), orth.smooth = NULL, nl.level = NULL, family = stats::poisson(), re = NULL, parold_re = 1) {
   fam <- .resolve_clgam_family(family)
+  re <- .clgam_resolve_re(re)
+  if (identical(re, "coarse") && isTRUE(fam$quasi)) {
+    warning(
+      "re='coarse' and family=quasipoisson() both model overdispersion.",
+      call. = FALSE
+    )
+  }
   nl.basis <- match.arg(nl.basis)
   if (is.null(orth.smooth)) {
     orth.smooth <- identical(nl.basis, "pspline")
@@ -171,15 +187,6 @@ pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL,
   } else {
     0L
   }
-  kron.meta <- tryCatch(
-    .sop_kron_meta(MM1, MM2, pord = pord, n_nl_random = n_nl_random),
-    error = function(e) NULL
-  )
-
-  # Set starting coefficients
-  if (is.null(bold)) {
-    bold <- rep(0, sum(np))
-  }
 
   # Build spatial mixed model matrices
   X <- rten2(X2, X1)
@@ -270,6 +277,43 @@ pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL,
   C <- .as_comp_C(C, backend = sparse.backend)
   C_groups <- if (.is_partition_C(C)) .partition_groups(C) else NULL
 
+  n_re <- 0L
+  Z_re <- NULL
+  re_idx <- integer(0)
+  Greinv.n <- NULL
+  if (identical(re, "coarse")) {
+    if (is.null(C_groups)) {
+      stop(
+        "re='coarse' requires a nested 0-1 partition C ",
+        "(one fine unit per coarse cell).",
+        call. = FALSE
+      )
+    }
+    n_re <- nrow(C)
+    Z_re <- .clgam_Z_re(C_groups, n_re)
+    q0 <- ncol(Z)
+    Z <- cbind(Z, Z_re)
+    np <- c(np, n_re)
+    G1inv.n <- c(G1inv.n, rep(0, n_re))
+    G2inv.n <- c(G2inv.n, rep(0, n_re))
+    if (!is.null(nlcovfine)) {
+      for (k in seq_len(nk)) {
+        Gkinv.n[[k]] <- c(Gkinv.n[[k]], rep(0, n_re))
+      }
+    }
+    Greinv.n <- c(rep(0, q0), rep(1, n_re))
+    re_idx <- q0 + seq_len(n_re)
+    n_nl_random <- n_nl_random + n_re
+  }
+
+  kron.meta <- tryCatch(
+    .sop_kron_meta(MM1, MM2, pord = pord, n_nl_random = n_nl_random),
+    error = function(e) NULL
+  )
+  if (is.null(bold)) {
+    bold <- rep(0, sum(np))
+  }
+
   # Compute eta, gamma, and mu vectors
   eta <- c(X %*% bold[1:np[1]] + Z %*% bold[-(1:np[1])])
   gamma <- c(efine*exp(eta))
@@ -287,11 +331,15 @@ pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL,
     }
     la <- c(la, paroldnl)
   }
+  if (n_re > 0L) {
+    la <- c(la, as.numeric(parold_re)[1L])
+  }
 
   # Optimization procedure
   diverged <- FALSE
   pirls_elements <- NULL
   tol <- NA_real_
+  ed_re <- NA_real_
   for (i in 1:(maxit[1])) {
     # Set the clock for SOP
     start.SOP <- proc.time()[3]
@@ -309,6 +357,9 @@ pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL,
         for (k in 1:nk) {
           Ginv <- c(Ginv, (1/la[(k+2)])*dk[[k]])
         }
+      }
+      if (n_re > 0L) {
+        Ginv <- c(Ginv, rep(1 / la[length(la)], n_re))
       }
       G <- 1/Ginv
 
@@ -352,6 +403,13 @@ pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL,
       lanew <- c(tau1, tau2)
       if (!is.null(nlcovfine)) {
         lanew <- c(lanew, tauk)
+      }
+      if (n_re > 0L) {
+        Greinv.d <- (1 / la[length(la)]) * Greinv.n
+        ed_re <- max(sum(dZtNZ * (Greinv.d * G^2)), 1e-50)
+        tau_re <- sum(b.random^2 * Greinv.n) / ed_re
+        tau_re <- max(tau_re, 1e-50)
+        lanew <- c(lanew, tau_re)
       }
       dla <- mean(abs(la - lanew))
       # Early exit when relative change is already tiny (avoids grinding to maxit=100)
@@ -414,9 +472,10 @@ pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL,
     if (trace) {cat("Convergence criterion: ", tol, "\n")}
     # Cache PIRLS-weighted covariance blocks once at the final outer step
     # (reused below for AIC/BIC/SEs when elements=TRUE).
-    if (isTRUE(elements) && (tol < thr[1] || i == maxit[1])) {
+      if (isTRUE(elements) && (tol < thr[1] || i == maxit[1])) {
       ginvsp_pe <- .ginvsp_from_la(la, g2u, g1u, g2b, g1b,
-                                   dk = if (!is.null(nlcovfine)) dk else NULL)
+                                   dk = if (!is.null(nlcovfine)) dk else NULL,
+                                   n_re = n_re)
       pirls_elements <- .pirls_bayes_blocks(
         C, gamma, eta, mu, y, X, Z, ginvsp_pe, groups = C_groups
       )
@@ -427,9 +486,18 @@ pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL,
   # Compute deviance (same formula for Poisson and quasi-Poisson)
   dev <- 2*sum(y*log(ifelse(y == 0, 1, y/mu)) - (y - mu))
 
+  eta.full <- eta
+  re_hat <- NULL
+  q_struct <- ncol(Z) - n_re
+  if (n_re > 0L) {
+    re_hat <- as.numeric(b.random[re_idx])
+    eta <- eta.full - as.numeric(Z_re %*% re_hat)
+  }
+
   # Obtain inverse of G (store diagonal; expand only if callers need matrix)
   ginvsp <- .ginvsp_from_la(la, g2u, g1u, g2b, g1b,
-                            dk = if (!is.null(nlcovfine)) dk else NULL)
+                            dk = if (!is.null(nlcovfine)) dk else NULL,
+                            n_re = n_re)
   # Stored only for inspection (no internal code path reads matlist$Ginv);
   # ginvsp is structurally diagonal, so a dense q x q diag() here wastes
   # O(q^2) memory (q = number of penalized coefficients, can be in the
@@ -442,9 +510,15 @@ pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL,
   if (!is.null(nlcovfine)) {
     edf <- c(edf, edk)
   }
+  if (n_re > 0L) {
+    edf <- c(edf, ed_re)
+  }
   vc_names <- c("spatial.x1", "spatial.x2")
   if (!is.null(nlcovfine)) {
     vc_names <- c(vc_names, .clgam_mat_colnames(nlcovfine, "s"))
+  }
+  if (n_re > 0L) {
+    vc_names <- c(vc_names, "re.coarse")
   }
   if (length(vc_names) == length(la)) names(la) <- vc_names
   if (length(vc_names) == length(edf)) names(edf) <- vc_names
@@ -558,8 +632,8 @@ pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL,
     knots1 = MM1$knots, knots2 = MM2$knots,
     y = y, x1 = x1, x2 = x2, efine = efine,
     lcovfine = lcovfine, nlcovfine = nlcovfine,
-    eta = eta, gamma = gamma, mu = mu,
-    var.comp = la, edf = edf, niter = i, elapsed.time = comp.time,
+    eta = eta, eta.full = eta.full, gamma = gamma, mu = mu,
+    re = re_hat, var.comp = la, edf = edf, niter = i, elapsed.time = comp.time,
     diverged = diverged,
     tol = tol, maxit = maxit, thr = thr,
     converged = isTRUE(!diverged && is.finite(tol) && tol < thr[1]),
@@ -572,7 +646,9 @@ pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL,
     nleffects = nleffects, sdnleffects = sdnleffects,
     nl.basis = nl.basis, orth.smooth = orth.smooth,
     nl.level = if (length(nl_level_resolved)) nl_level_resolved else nl.level,
-    orth.info = orth_info
+    orth.info = orth_info,
+    method = "SOP",
+    re_term = re
   )
 
   if (isTRUE(elements)) {
@@ -589,8 +665,12 @@ pois_SOP <- function(y, x1, x2, efine = NULL, lcovfine = NULL, nlcovfine = NULL,
     bic <- dev + log(length(y)) * ed
     sd.eta <- sqrt(
       .quad_diag(X, M1$S11) +
-        2 * rowSums((X %*% M1$S12) * Z) +
-        .quad_diag(Z, M1$S22)
+        2 * rowSums((X %*% M1$S12[, seq_len(q_struct), drop = FALSE]) *
+                      Z[, seq_len(q_struct), drop = FALSE]) +
+        .quad_diag(
+          Z[, seq_len(q_struct), drop = FALSE],
+          M1$S22[seq_len(q_struct), seq_len(q_struct), drop = FALSE]
+        )
     )
     out$ed <- ed
     out$aic <- aic

@@ -4,13 +4,20 @@
 \alias{s}
 \title{Univariate or spatial P-spline term (formula interface)}
 \usage{
-s(..., k = NULL, level = "fine")
+s(..., ndx = NULL, bdeg = 3, pord = 2, k = NULL, level = "fine")
 }
 \arguments{
 \item{...}{one name (\code{s(z)}) or two (\code{s(x1, x2)})}
 
-\item{k}{knot count: length 1 for a univariate smooth, length 2 (or
-recycled) for space}
+\item{ndx}{number of internal B-spline intervals (passed as \code{ndx} /
+\code{ndxnl} to \code{\link{pois_SOP}}). Length 1 for a univariate
+smooth; length 2 (or recycled) for space. Alias: \code{k}.}
+
+\item{bdeg}{B-spline degree (default \code{3})}
+
+\item{pord}{difference penalty order (default \code{2})}
+
+\item{k}{alias for \code{ndx} (mgcv-style). Ignored if \code{ndx} is set.}
 
 \item{level}{\code{"fine"} (default) or \code{"coarse"} (Case B/C
 aggregated-scale smooth)}
@@ -21,10 +28,17 @@ An object of class \code{"clgam.smooth.spec"} (not used directly)
 \description{
 Used on the right-hand side of a \code{\link{clgam}} formula.
 \code{s(x1, x2)} is the anisotropic spatial field; \code{s(z)} is a
-univariate smooth. \code{\link{clgam}} parses the \code{s()} \emph{call}
-and does not evaluate \pkg{mgcv}'s \code{s}. This helper exists so the
-syntax is documented and so \code{s} is found if a formula is ever
-evaluated.
+univariate P-spline. A bare name \code{z} (no \code{s()}) is a
+\emph{linear} covariate, equivalent to the \code{linear=} argument.
+}
+\details{
+P-spline settings follow the package notation:
+\code{s(x1, x2, ndx = c(15, 15), bdeg = 3, pord = 2)}.
+
+\code{\link{clgam}} walks the formula language object and looks for the
+symbol \code{s}; it does not call \code{mgcv::s}. If both packages are
+attached, \code{s(...)} in a \code{clgam} formula still works. Use
+\code{?clgam::s} (or attach \pkg{clgam} last) for this help page.
 }
 \seealso{
 \code{\link{clgam}}, \code{\link{simulate_ata_scenarios}}

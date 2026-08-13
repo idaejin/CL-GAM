@@ -17,10 +17,12 @@ formula / \code{orth.smooth}. Aliases: \code{"identifiability"}
 \code{"matern1"}.
 }
 \details{
-Recovery of Cases A--C in the manuscript uses \code{orth.smooth = FALSE}.
-The confounding / identifiability experiment (and Madrid Case A) uses
-\code{orth.smooth = TRUE}. Misspecification DGPs (Matern, jump) are
-spatial-only.
+Cases A and C generate residual spatial truth \eqn{f_\perp=(I-P_{B(z_{\mathrm{f}})})f_{\mathrm{raw}}}
+(same projection as \code{orth.smooth=TRUE}). Case B is unchanged
+(coarse \eqn{h} is not in \eqn{A_{\mathrm{f}}}). Confounding remains the
+\eqn{\rho}-mixing stress test. Pass \code{identifying="unrestricted"} to
+reproduce the older A/C DGP \eqn{\eta=f_{\mathrm{raw}}+g}. Misspecification
+DGPs (Matern, jump) are spatial-only.
 }
 \examples{
 simulate_ata_scenarios()[, c("scenario", "formula", "orth.smooth")]

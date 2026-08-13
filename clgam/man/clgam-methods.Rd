@@ -14,7 +14,11 @@
 \usage{
 \method{coef}{clgam}(object, which = c("all", "fixed", "random"), ...)
 
-\method{fitted}{clgam}(object, type = c("mu", "eta", "gamma", "response", "exp.eta"), ...)
+\method{fitted}{clgam}(
+  object,
+  type = c("mu", "eta", "gamma", "response", "exp.eta", "diff", "shared"),
+  ...
+)
 
 \method{residuals}{clgam}(object, type = c("deviance", "pearson", "response"), ...)
 

@@ -34,6 +34,8 @@ summary.clgam <- function(object, ...) {
     call = object$call,
     type = type,
     family = fam,
+    method = object$method %||% "SOP",
+    re_term = object$re_term %||% "none",
     n_coarse = if (!is.null(object$y)) length(object$y) else NA_integer_,
     n_fine = if (!is.null(object$eta)) length(object$eta) else NA_integer_,
     niter = object$niter,
@@ -58,7 +60,11 @@ summary.clgam <- function(object, ...) {
     kappa = object$orth.info$kappa,
     kappa_by = kappa_by,
     orth.smooth = object$orth.smooth,
-    orth.applied = object$orth.info$applied
+    orth.applied = object$orth.info$applied,
+    structure = object$structure,
+    mean_se_dif = if (!is.null(object$sd.dif)) mean(object$sd.dif) else NULL,
+    mean_se_shared = if (!is.null(object$sd.shared)) mean(object$sd.shared) else NULL,
+    mean_se_dif2 = if (!is.null(object$sd.dif2)) mean(object$sd.dif2) else NULL
   )
   class(out) <- "summary.clgam"
   out
@@ -76,7 +82,13 @@ print.summary.clgam <- function(x, digits = 4, ...) {
     print(x$call)
   }
   cat("Type: ", x$type %||% "spatial",
-      "    Family: ", x$family %||% "poisson", "\n", sep = "")
+      "    Family: ", x$family %||% "poisson",
+      "    Method: ", x$method %||% "SOP",
+      if (!is.null(x$re_term) && !identical(x$re_term, "none"))
+        paste0("    re: ", x$re_term) else "",
+      if (identical(x$type, "contrast") && !is.null(x$structure))
+        paste0("    structure: ", x$structure) else "",
+      "\n", sep = "")
   if (is.finite(x$n_coarse) || is.finite(x$n_fine)) {
     cat("n (coarse): ", x$n_coarse, "    n (fine): ", x$n_fine, "\n", sep = "")
   }
@@ -169,6 +181,18 @@ print.summary.clgam <- function(x, digits = 4, ...) {
   } else {
     cat("  AIC/BIC: not computed (refit with elements=TRUE)\n")
   }
+  if (identical(x$type, "contrast") && !is.null(x$mean_se_dif)) {
+    cat("\nContrast inference (Bayesian SE, conditional on tau^2)\n")
+    cat("  Mean se(eta1-eta2) [joint]: ", signif(x$mean_se_dif, digits), sep = "")
+    if (!is.null(x$mean_se_dif2)) {
+      cat("    indep. approx: ", signif(x$mean_se_dif2, digits), sep = "")
+    }
+    cat("\n")
+    if (!is.null(x$mean_se_shared)) {
+      cat("  Mean se((eta1+eta2)/2): ", signif(x$mean_se_shared, digits), "\n", sep = "")
+    }
+    cat("  Pointwise intervals: clgam_contrast_infer(fit); plot(fit, which=7)\n")
+  }
   invisible(x)
 }
 
@@ -185,11 +209,20 @@ print.summary.clgam <- function(x, digits = 4, ...) {
 .clgam_edf_names <- function(fit) {
   n_ed <- length(fit$edf)
   if (identical(fit$type, "contrast") || inherits(fit, "clgam_contrast")) {
-    nms <- c("spatial.g1.x1", "spatial.g1.x2", "spatial.g2.x1", "spatial.g2.x2")
+    nms <- if (identical(fit$structure, "contrast")) {
+      c("spatial.shared.x1", "spatial.shared.x2",
+        "spatial.contrast.x1", "spatial.contrast.x2")
+    } else {
+      c("spatial.g1.x1", "spatial.g1.x2", "spatial.g2.x1", "spatial.g2.x2")
+    }
     return(nms[seq_len(min(n_ed, length(nms)))])
   }
   sm <- .clgam_mat_colnames(fit$nlcovfine, "s")
   nms <- c("spatial.x1", "spatial.x2", sm)
+  if (identical(fit$re_term, "coarse") ||
+      (!is.null(names(fit$var.comp)) && "re.coarse" %in% names(fit$var.comp))) {
+    nms <- c(nms, "re.coarse")
+  }
   if (length(nms) != n_ed) {
     extra <- max(n_ed - 2L, 0L)
     nms <- c("spatial.x1", "spatial.x2", paste0("s", seq_len(extra)))

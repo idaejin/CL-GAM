@@ -28,18 +28,33 @@ coef.clgam <- function(object, which = c("all", "fixed", "random"), ...) {
 #' @rdname clgam-methods
 #' @param type for \code{fitted}/\code{predict}: \code{"mu"} (coarse mean),
 #'   \code{"eta"} (fine log-risk), \code{"gamma"} (fine intensity),
-#'   \code{"response"} (alias of \code{mu}), or \code{"exp.eta"}
+#'   \code{"response"} (alias of \code{mu}), \code{"exp.eta"},
+#'   or for two-group fits \code{"diff"} (\eqn{\eta_1-\eta_2}) and
+#'   \code{"shared"} (\eqn{(\eta_1+\eta_2)/2})
 #' @export
 #' @method fitted clgam
 fitted.clgam <- function(object,
-                         type = c("mu", "eta", "gamma", "response", "exp.eta"),
+                         type = c("mu", "eta", "gamma", "response", "exp.eta",
+                                  "diff", "shared"),
                          ...) {
   type <- match.arg(type)
   switch(type,
     mu = , response = object$mu,
     eta = object$eta,
     gamma = object$gamma,
-    exp.eta = exp(object$eta)
+    exp.eta = exp(object$eta),
+    diff = {
+      if (is.null(object$eta.diff)) {
+        stop("fitted type='diff' requires a two-group contrast fit.", call. = FALSE)
+      }
+      object$eta.diff
+    },
+    shared = {
+      if (is.null(object$eta.shared)) {
+        stop("fitted type='shared' requires a two-group contrast fit.", call. = FALSE)
+      }
+      object$eta.shared
+    }
   )
 }
 
@@ -149,7 +164,7 @@ BIC.clgam <- function(object, ...) {
 #' @param object a \code{clgam} fit
 #' @param newdata currently must be \code{NULL}
 #' @param type \code{"eta"}, \code{"mu"}, \code{"gamma"}, \code{"response"},
-#'   or \code{"exp.eta"}
+#'   \code{"exp.eta"}, or for two-group fits \code{"diff"} / \code{"shared"}
 #' @param se.fit if \code{TRUE} and SEs were computed (\code{elements=TRUE}),
 #'   return a list with \code{fit} and \code{se.fit}
 #' @param ... unused
@@ -157,7 +172,8 @@ BIC.clgam <- function(object, ...) {
 #' @method predict clgam
 predict.clgam <- function(object,
                           newdata = NULL,
-                          type = c("eta", "mu", "gamma", "response", "exp.eta"),
+                          type = c("eta", "mu", "gamma", "response", "exp.eta",
+                                   "diff", "shared"),
                           se.fit = FALSE,
                           ...) {
   if (!is.null(newdata)) {
@@ -170,10 +186,13 @@ predict.clgam <- function(object,
   se <- switch(type,
     eta = object$sd.eta,
     exp.eta = object$sd.exp.eta,
+    diff = object$sd.dif,
+    shared = object$sd.shared,
     mu = , response = , gamma = NULL
   )
   if (is.null(se)) {
-    warning("SEs not available for type='", type, "' (need elements=TRUE and type eta/exp.eta).",
+    warning("SEs not available for type='", type,
+            "' (need elements=TRUE; type eta/exp.eta/diff/shared).",
             call. = FALSE)
   }
   list(fit = fit, se.fit = se)
@@ -186,7 +205,8 @@ predict.clgam <- function(object,
 #' @param x a \code{clgam} fit
 #' @param which which plot(s): \code{1} fine \eqn{\hat\eta}; \code{2} y vs
 #'   \eqn{\hat\mu}; \code{3} residuals; \code{4} smooth; \code{5} contrast;
-#'   \code{6} coarse map of \eqn{y-\hat\mu}
+#'   \code{6} coarse map of \eqn{y-\hat\mu}; \code{7} classified contrast
+#'   (\eqn{\widehat{\eta}_1-\widehat{\eta}_2} vs \code{sd.dif})
 #' @param ask ask before each plot when length(which) > 1
 #' @param sf_fine,sf_coarse optional \pkg{sf} layers (else \code{x$sf_fine} /
 #'   \code{x$sf_coarse})
@@ -218,6 +238,7 @@ plot.clgam <- function(x,
   if (4L %in% show) .clgam_plot_smooths(x, dots, g_true = g_true)
   if (5L %in% show) .clgam_plot_contrast(x, dots, sf_fine = sf_fine)
   if (6L %in% show) .clgam_plot_coarse_map(x, dots, sf_coarse = sf_coarse)
+  if (7L %in% show) .clgam_plot_contrast_class(x, dots, sf_fine = sf_fine)
   invisible(x)
 }
 
@@ -451,4 +472,49 @@ plot.clgam <- function(x,
       main = expression(hat(eta)[1] - hat(eta)[2])
     )
   }
+}
+
+#' Three-class contrast map using joint SE of eta1 - eta2
+#' @keywords internal
+.clgam_plot_contrast_class <- function(x, dots, sf_fine = NULL, level = 0.95) {
+  if (!inherits(x, "clgam_contrast") &&
+      !identical(x$type, "contrast") &&
+      !identical(x$family, "contrast")) {
+    message("Classified contrast plot only for two-group fits (clgam_contrast).")
+    return(invisible(NULL))
+  }
+  inf <- tryCatch(
+    clgam_contrast_infer(x, type = "diff", level = level, uncond = FALSE),
+    error = function(e) NULL
+  )
+  if (is.null(inf)) {
+    message("Classified contrast plot needs elements=TRUE (sd.dif).")
+    return(invisible(NULL))
+  }
+  pal <- c("-1" = "#4DAF4A", "0" = "#FF7F00", "1" = "#377EB8")
+  cols <- unname(pal[as.character(inf$sign)])
+  n2 <- nrow(inf)
+  main <- sprintf(
+    "Contrast map (pointwise %.0f%%; green: eta1 < eta2)",
+    100 * level
+  )
+
+  if (!is.null(sf_fine) && requireNamespace("sf", quietly = TRUE) &&
+      inherits(sf_fine, "sf") && nrow(sf_fine) >= n2) {
+    geom <- sf::st_geometry(sf_fine)[seq_len(n2)]
+    op <- graphics::par(mar = c(4, 4, 2.5, 1))
+    on.exit(graphics::par(op), add = TRUE)
+    plot(geom, col = cols, border = "grey30", lwd = 0.3,
+         main = main, axes = TRUE, reset = FALSE)
+  } else if (!is.null(x$x1)) {
+    graphics::plot(
+      x$x1[seq_len(n2)], x$x2[seq_len(n2)],
+      col = cols, pch = dots$pch %||% 16, cex = dots$cex %||% 0.7,
+      xlab = "x1", ylab = "x2", asp = 1, main = main
+    )
+  }
+  graphics::legend(
+    "topright", bty = "n", pch = 16,
+    col = pal, legend = c("eta1 < eta2", "n.s.", "eta1 > eta2")
+  )
 }

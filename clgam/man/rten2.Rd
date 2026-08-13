@@ -7,12 +7,12 @@
 rten2(X1, X2)
 }
 \arguments{
-\item{X1}{TODO}
-
-\item{X2}{TODO}
+\item{X1, X2}{numeric matrices with the same number of rows}
 }
 \value{
-TODO
+Row-wise (Box) Kronecker product: each row of the result is
+  the Kronecker product of the corresponding rows of \code{X1} and
+  \code{X2}. Dimensions \eqn{n \times (c_1 c_2)}.
 }
 \description{
 Row-wise or Box Kronecker product of two matrices

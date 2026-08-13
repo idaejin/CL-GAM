@@ -17,12 +17,16 @@ mm_basis(x, xl, xr, ndx, bdeg, pord, decom = 1)
 
 \item{bdeg}{A numerical value that indicates the degree of the B-splines.}
 
-\item{pord}{TODO}
+\item{pord}{penalty order (number of differences in \code{D})}
 
-\item{decom}{TODO}
+\item{decom}{fixed-effect construction: \code{1} uses the penalty
+null space (\code{B \%*\% Un}); \code{2} uses the polynomial
+\code{1, x, ..., x^(pord-1)}}
 }
 \value{
-TODO
+A list with fixed \code{X}, random \code{Z}, penalty
+  eigenvalues \code{d}, basis \code{B}, dimension \code{m},
+  difference matrix \code{D}, eigenvectors \code{U}, and \code{knots}.
 }
 \description{
 Construct elements of the mixed model representation
